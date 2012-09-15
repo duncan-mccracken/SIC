@@ -3126,9 +3126,7 @@ function set_AllTimeZones {
 			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then a=0 ; fi
 			printf "\b${spin:s++%${#spin}:1}"
 		done
-		if [ ${a} -eq 1 ] ; then
-			AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" )
-		fi
+		if [ ${a} -eq 1 ] ; then AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" ) ; fi
 	done
 	printf "\bdone\n"
 }
@@ -3692,26 +3690,22 @@ function select_TimeZone {
 		if [ "${ClosestCity}" == "${ZNAME}" ] ; then GeonameID=${ZGEONAMEIDS[i]} ; break ; fi
 		let i++
 	done
-	if [ ${Minor} -gt 5 ] ; then
-		while [ -z "${AutoTZ}" ] ; do
-			display_Subtitle "Select Time Zone"
-			display_TimeZone
-			if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then
-				echo "Note:	This setting only applies to Mac OS X 10.6 or 10.7"
-				echo
-			fi
-			read -sn 1 -p "Set time zone automatically using current location (Y/n)? " AutoTZ < /dev/tty
-			if [ -z "${AutoTZ}" ] ; then AutoTZ="y" ; fi
-			case "${AutoTZ}" in
-				"Y" | "y" ) echo ; TZAuto=1 ;;
-				"N" | "n" ) echo ; TZAuto=0 ;;
-				* ) echo ; AutoTZ="" ;;
-			esac
-		done
-		AutoTZ=""
-	else
-		if [ -z "${TZAuto}" ] ; then TZAuto=0 ; fi
-	fi
+	while [ -z "${AutoTZ}" ] ; do
+		display_Subtitle "Select Time Zone"
+		display_TimeZone
+		if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then
+			echo "Note:	This setting only applies to Mac OS X 10.6 or 10.7"
+			echo
+		fi
+		read -sn 1 -p "Set time zone automatically using current location (Y/n)? " AutoTZ < /dev/tty
+		if [ -z "${AutoTZ}" ] ; then AutoTZ="y" ; fi
+		case "${AutoTZ}" in
+			"Y" | "y" ) echo ; TZAuto=1 ;;
+			"N" | "n" ) echo ; TZAuto=0 ;;
+			* ) echo ; AutoTZ="" ;;
+		esac
+	done
+	AutoTZ=""
 }
 
 function display_RemoteLogin {
