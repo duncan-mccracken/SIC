@@ -11,6 +11,8 @@ SICVersion="1.5a0"
 
 # Section: Common
 
+spin="/-\|"
+
 function display_Title {
 	clear
 	printf "\033[1mSystem Image Creator (SIC) ${SICVersion}\033[m\n"
@@ -2621,7 +2623,8 @@ function set_UseGeoKit {
 			unset Localizable_Cities[@]
 			unset Localizable_Countries[@]
 			display_Title
-			printf "\nCreating Location database "
+			printf "\nCreating Location Database ...  "
+			s=1
 			TimeZonePrefPane="${Target}/System/Library/PreferencePanes/DateAndTime.prefPane/Contents/Resources/TimeZone.prefPane"
 			IsPlist=`file "${TimeZonePrefPane}/Contents/Resources/English.lproj/Localizable_Cities.strings" | grep -vq "property list" ; echo ${?}`
 			i=0 ; while : ; do
@@ -2640,10 +2643,10 @@ function set_UseGeoKit {
 					Localizable_Cities[i]=`cat "${TimeZonePrefPane}/Contents/Resources/English.lproj/Localizable_Cities.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_5[i]}\"" | awk -F "\"" '{print $4}'`
 					Localizable_Countries[i]=`cat "${TimeZonePrefPane}/Contents/Resources/English.lproj/Localizable_Countries.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_6[i]}\"" | awk -F "\"" '{print $4}'`
 				fi
-				printf "."
+				printf "\b${spin:s++%${#spin}:1}"
 				let i++
 			done
-			printf " done"
+			printf "\bdone\n"
 		fi
 	else
 		UseGeoKit=1
@@ -3099,12 +3102,14 @@ function set_CountryTimeZones {
 function set_AllTimeZones {
 	unset AllTZFiles[@]
 	display_Title
-	printf "\nCreating Time Zone list "
+	printf "\nCreating Time Zone list ...  "
+	s=1
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		i=0 ; while [ ${i} -lt ${#all_cities_adj_3[@]} ] ; do
 			a=1
 			for TZFILE in "${AllTZFiles[@]}" ; do
 				if [ "${TZFILE}" == "${all_cities_adj_3[i]}" ] ; then a=0 ; break ; fi
+				printf "\b${spin:s++%${#spin}:1}"
 			done
 			if [ ${a} -eq 1 ] ; then AllTZFiles=( "${AllTZFiles[@]}" "${all_cities_adj_3[i]}" ) ; fi
 			let i++
@@ -3119,10 +3124,13 @@ function set_AllTimeZones {
 		a=1
 		for TIMEZONE in "${AllTimeZones[@]}" ; do
 			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then a=0 ; fi
+			printf "\b${spin:s++%${#spin}:1}"
 		done
-		if [ ${a} -eq 1 ] ; then AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" ) ; printf "." ; fi
+		if [ ${a} -eq 1 ] ; then
+			AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" )
+		fi
 	done
-	printf " done"
+	printf "\bdone\n"
 }
 
 function set_OtherTimeZones {
@@ -3302,11 +3310,9 @@ function set_TZCountries {
 	IFS=$'\n'
 	for ZCODE in "${ZCODES[@]}" ; do
 		ZNAMES=( "${ZNAMES[@]}" $(set_TZCountry "${ZCODE}") )
-		printf "."
 	done
 	TZCountries=( `for ZNAME in "${ZNAMES[@]}" ; do echo "${ZNAME}" ; done | sort -u` )
 	unset IFS
-	echo " done"
 }
 
 function set_ClosestCities {
@@ -3315,7 +3321,8 @@ function set_ClosestCities {
 	unset ZNAMES[@]
 	unset ClosestCities[@]
 	display_Title
-	printf "\nCreating list of Cities "
+	printf "\nCreating list of Cities ...  "
+	s=1
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		for TZFILE in "${TZFiles[@]}" ; do
 			a=0
@@ -3323,10 +3330,10 @@ function set_ClosestCities {
 				if [ "${TZFILE}" == "${Item}" ] ; then
 					if [ "${1}" == "${all_cities_adj_4[i]}" ] ; then a=1 ; break ; fi
 				fi
+				printf "\b${spin:s++%${#spin}:1}"
 				let i++
 			done
 			if [ ${a} -eq 1 ] ; then ZGEONAMEIDS=( ${ZGEONAMEIDS[@]} ${all_cities_adj_7[i]} ) ; fi
-			printf "."
 		done
 	else
 		Query="select Z_PK from ${PLACES} where ZCODE = '${1}';"
@@ -3334,16 +3341,17 @@ function set_ClosestCities {
 		for TZFILE in "${TZFiles[@]}" ; do
 			Query="select ZGEONAMEID from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY} AND ZTIMEZONENAME = '${TZFILE}';"
 			ZGEONAMEIDS=( ${ZGEONAMEIDS[@]} `sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null` )
+			printf "\b${spin:s++%${#spin}:1}"
 		done
 	fi
 	IFS=$'\n'
 	for ZGEONAMEID in ${ZGEONAMEIDS[@]} ; do
 		ZNAMES=( "${ZNAMES[@]}" "$(set_ClosestCity ${ZGEONAMEID})" )
-		printf "."
+		printf "\b${spin:s++%${#spin}:1}"
 	done
 	ClosestCities=( `for ZNAME in "${ZNAMES[@]}" ; do echo "${ZNAME}" ; done | sort -u` )
 	unset IFS
-	echo " done"
+	printf "\bdone\n"
 }
 
 function save_GeonameID {
@@ -3528,14 +3536,23 @@ function select_Keyboard {
 }
 
 function display_LocationServices {
-	printf "Location Services:	["
-	if [ ${LocationServices} -eq 1 ] ; then printf "*" ; else printf " " ; fi
+	printf "Location Services:	"
+	printf "["
+	if [ ${LocationServices} -eq 1 ] ; then
+		if [ ${Minor} -lt 8 ] ; then printf "-" ; else printf "*" ; fi
+	else
+		printf " "
+	fi
 	printf "] Enable Location Services on this Mac\n\n"
 }
 
 function select_LocationServices {
 	display_Subtitle "Location Services"
 	display_LocationServices
+	if [ ${Minor} -lt 8 ] ; then
+		echo "Note:	This setting only applies to Mac OS X 10.8 or greater"
+		echo
+	fi
 	while [ -z "${EnableLS}" ] ; do
 		read -sn 1 -p "Enable Location Services on this Mac (y/N)? " EnableLS < /dev/tty
 		if [ -z "${EnableLS}" ] ; then EnableLS="n" ; fi
@@ -3603,11 +3620,13 @@ function display_TimeZone {
 		printf "-"
 	fi
 	printf "\n"
-	if [ ${Minor} -gt 5 ] ; then
-		printf "			["
-		if [ ${TZAuto} -eq 1 ] ; then printf "*" ; else printf " " ; fi
-		printf "] Set time zone automatically using current location\n"
+	printf "			["
+	if [ ${TZAuto} -eq 1 ] ; then
+		if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then printf "-" ; else printf "*" ; fi
+	else
+		printf " "
 	fi
+	printf "] Set time zone automatically using current location\n"
 	printf "\n"
 }
 
@@ -3677,6 +3696,10 @@ function select_TimeZone {
 		while [ -z "${AutoTZ}" ] ; do
 			display_Subtitle "Select Time Zone"
 			display_TimeZone
+			if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then
+				echo "Note:	This setting only applies to Mac OS X 10.6 or 10.7"
+				echo
+			fi
 			read -sn 1 -p "Set time zone automatically using current location (Y/n)? " AutoTZ < /dev/tty
 			if [ -z "${AutoTZ}" ] ; then AutoTZ="y" ; fi
 			case "${AutoTZ}" in
@@ -3761,7 +3784,10 @@ function display_Output {
 	echo
 	display_Target
 	set_Localization "${Language}"
-	if [ ${RemoteManagement} -eq 1 ] || [ ${LocationServices} -eq 1 ] ; then
+	FirstBoot=0
+	if [ ${RemoteManagement} -eq 1 ] ; then FirstBoot=1 ; fi
+	if [ ${LocationServices} -eq 1 ] && [ ${Minor} -ge 8 ] ; then FirstBoot=1 ; fi
+	if [ ${FirstBoot} -eq 1 ] ; then
 		printf "\033[1m/Library/LaunchDaemons/FirstBoot.plist\033[m\n"
 		echo "Dict {"
 		echo "    Label = FirstBoot"
@@ -4116,7 +4142,7 @@ function display_Output {
 	printf "\033[1m/var/log/CDIS.custom\033[m\n"
 	echo "LANGUAGE=${Localization}"
 	echo
-	if [ ${RemoteManagement} -eq 1 ] || [ ${LocationServices} -eq 1 ] ; then
+	if [ ${FirstBoot} -eq 1 ] ; then
 		printf "\033[1m${FirstBootPath}/FirstBoot.sh\033[m\n"
 		printf \#\!"/bin/sh\n"
 		echo "ScriptPath=\`dirname \"\${0}\"\`"
@@ -4131,7 +4157,7 @@ function display_Output {
 		echo "exit 0"
 		echo
 	fi
-	if [ ${LocationServices} -eq 1 ] ; then
+	if [ ${LocationServices} -eq 1 ] && [ ${Minor} -ge 8 ] ; then
 		printf "\033[1m${FirstBootPath}/Actions/LocationServices.sh\033[m\n"
 		printf \#\!"/bin/sh\n"
 		echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then"
@@ -4160,10 +4186,13 @@ function menu_Configuration {
 	while [ "${Option}" != "Exit" ] ; do
 		display_Subtitle "Configuration"
 		display_Configuration
-		Options=( "Target" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Display Output" "Save Settings" "Exit" )
+		Options=( "Exit" "Save Settings" "Display Output" "Target" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" )
 		display_Options "Options" "Select an option: "
 		select Option in "${Options[@]}" ; do
 			case "${Option}" in
+				"Exit" ) break ;;
+				"Save Settings" ) save_Settings ; Option="" ; break ;;
+				"Display Output" ) display_Output ; Option="" ; break ;;
 				"Target" ) get_Volumes ; select_Target ; Option="" ; break ;;
 				"Language" ) select_Language ; Option="" ; break ;;
 				"Country" ) select_Country ; Option="" ; break ;;
@@ -4173,9 +4202,6 @@ function menu_Configuration {
 				"Time Zone" ) select_TimeZone ; Option="" ; break ;;
 				"Remote Login" ) select_RemoteLogin ; Option="" ; break ;;
 				"Remote Management" ) select_RemoteManagement ; Option="" ; break ;;
-				"Save Settings" ) save_Settings ; Option="" ; break ;;
-				"Display Output" ) display_Output ; Option="" ; break ;;
-				"Exit" ) break ;;
 			esac
 		done
 	done
