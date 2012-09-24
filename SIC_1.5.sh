@@ -1192,6 +1192,236 @@ function save_Country {
 
 # Section: Keyboard
 
+function set_SAKeyboard_SATypingStyle {
+	# ${1}: InputSourceID
+	unset SAKeyboard
+	unset SATypingStyle
+	case "${1}" in
+		"AfghanDari" ) SAKeyboard="Afghan Dari" ;;
+		"AfghanPashto" ) SAKeyboard="Afghan Pashto" ;;
+		"AfghanUzbek" ) SAKeyboard="Afghan Uzbek" ;;
+		"Arabic" ) SAKeyboard="Arabic" ;;
+		"ArabicPC" ) SAKeyboard="Arabic - PC" ;;
+		"Arabic-QWERTY" ) SAKeyboard="Arabic - QWERTY" ;;
+		"Armenian-HMQWERTY" ) SAKeyboard="Armenian - HM QWERTY" ;;
+		"Armenian-WesternQWERTY" ) SAKeyboard="Armenian - Western QWERTY" ;;
+		"Australian" ) SAKeyboard="Australian" ;;
+		"Austrian" ) SAKeyboard="Austrian" ;;
+		"Azeri" ) SAKeyboard="Azeri" ;;
+		"Bangla" ) SAKeyboard="Bangla" ;;
+		"Bangla-QWERTY" ) SAKeyboard="Bangla - Qwerty" ;;
+		"Belgian" ) SAKeyboard="Belgian" ;;
+		"Brazilian" ) SAKeyboard="Brazilian" ;;
+		"British" ) SAKeyboard="British" ;;
+		"British-PC" ) SAKeyboard="British - PC" ;;
+		"Bulgarian" ) SAKeyboard="Bulgarian" ;;
+		"Bulgarian-Phonetic" ) SAKeyboard="Bulgarian - Phonetic" ;;
+		"Byelorussian" ) SAKeyboard="Byelorussian" ;;
+		"Canadian" ) SAKeyboard="Canadian English" ;;
+		"Canadian-CSA" ) SAKeyboard="Canadian French - CSA" ;;
+		"Cherokee-Nation" ) SAKeyboard="Cherokee - Nation" ;;
+		"Cherokee-QWERTY" ) SAKeyboard="Cherokee - QWERTY" ;;
+		"SCIM.ITABC" )
+			case ${Minor} in
+				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="ITABC" ;;
+				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Pinyin - Simplified" ;;
+			esac ;;
+		"SCIM.WBH" )
+			case ${Minor} in
+				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="Wubi Hua" ;;
+				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Wubi Hua" ;;
+			esac ;;
+		"SCIM.WBX" )
+			case ${Minor} in
+				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="Wubi Xing" ;;
+				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Wubi Xing" ;;
+			esac ;;
+		"TCIM.Cangjie" )
+			case ${Minor} in
+				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Cangjie" ;;
+				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Cangjie" ;;
+			esac ;;
+		"TCIM.Dayi" )
+			case ${Minor} in
+				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Dayi(Pro)" ;;
+				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Dayi Pro" ;;
+			esac ;;
+		"TCIM.Hanin" ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Hanin" ;;
+		"TCIM.Jianyi" )
+			case ${Minor} in
+				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Jianyi" ;;
+				6 | 7 ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Jianyi" ;;
+				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Sucheng" ;;
+			esac ;;
+		"TCIM.Pinyin" )
+			case ${Minor} in
+				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Pinyin" ;;
+				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Pinyin - Traditional" ;;
+			esac ;;
+		"TCIM.Zhuyin" )
+			case ${Minor} in
+				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Zhuyin" ;;
+				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Zhuyin" ;;
+			esac ;;
+		"TCIM.ZhuyinEten" ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Zhuyin - Eten" ;;
+		"Colemak" ) SAKeyboard="Colemak" ;;
+		"Croatian" ) SAKeyboard="Croatian" ;;
+		"Croatian-PC" ) SAKeyboard="Croatian - PC" ;;
+		"Czech" ) SAKeyboard="Czech" ;;
+		"Czech-QWERTY" ) SAKeyboard="Czech - QWERTY" ;;
+		"Danish" ) SAKeyboard="Danish" ;;
+		"Devanagari" ) SAKeyboard="Devanagari" ;;
+		"Devanagari-QWERTY" ) SAKeyboard="Devanagari - QWERTY" ;;
+		"Dutch" ) SAKeyboard="Dutch" ;;
+		"Dvorak" ) SAKeyboard="Dvorak" ;;
+		"Dvorak-Left" ) SAKeyboard="Dvorak - Left" ;;
+		"DVORAK-QWERTYCMD" ) SAKeyboard="Dvorak - Qwerty ⌘" ;;
+		"Dvorak-Right" ) SAKeyboard="Dvorak - Right" ;;
+		"Estonian" ) SAKeyboard="Estonian" ;;
+		"Faroese" ) SAKeyboard="Faroese" ;;
+		"Finnish" ) SAKeyboard="Finnish" ;;
+		"FinnishExtended" ) SAKeyboard="Finnish Extended" ;;
+		"FinnishSami-PC" ) SAKeyboard="Finnish Sami - PC" ;;
+		"French" ) SAKeyboard="French" ;;
+		"French-numerical" ) SAKeyboard="French - Numerical" ;;
+		"Georgian-QWERTY" ) SAKeyboard="Georgian - QWERTY" ;;
+		"German" ) SAKeyboard="German" ;;
+		"Greek" ) SAKeyboard="Greek" ;;
+		"GreekPolytonic" ) SAKeyboard="Greek Polytonic" ;;
+		"Gujarati" ) SAKeyboard="Gujarati" ;;
+		"Gujarati-QWERTY" ) SAKeyboard="Gujarati - QWERTY" ;;
+		"Gurmukhi" ) SAKeyboard="Gurmukhi" ;;
+		"Gurmukhi-QWERTY" ) SAKeyboard="Gurmukhi - QWERTY" ;;
+		"Korean.2SetKorean" ) SAKeyboard="Hangul" ; SATypingStyle="2-Set Korean" ;;
+		"Korean.3SetKorean" ) SAKeyboard="Hangul" ; SATypingStyle="3-Set Korean" ;;
+		"Korean.390Sebulshik" ) SAKeyboard="Hangul" ; SATypingStyle="390 Sebulshik" ;;
+		"Korean.GongjinCheongRomaja" ) SAKeyboard="Hangul" ; SATypingStyle="GongjinCheong Romaja" ;;
+		"Korean.HNCRomaja" ) SAKeyboard="Hangul" ; SATypingStyle="HNC Romaja" ;;
+		"Hawaiian" ) SAKeyboard="Hawaiian" ;;
+		"Hebrew" ) SAKeyboard="Hebrew" ;;
+		"Hebrew-PC" ) SAKeyboard="Hebrew - PC" ;;
+		"Hebrew-QWERTY" ) SAKeyboard="Hebrew - QWERTY" ;;
+		"Hungarian" ) SAKeyboard="Hungarian" ;;
+		"Icelandic" ) SAKeyboard="Icelandic" ;;
+		"Inuktitut-Nunavut" ) SAKeyboard="Inuktitut - Nunavut" ;;
+		"Inuktitut-Nutaaq" ) SAKeyboard="Inuktitut - Nutaaq" ;;
+		"Inuktitut-QWERTY" ) SAKeyboard="Inuktitut - QWERTY" ;;
+		"InuttitutNunavik" ) SAKeyboard="Inuttitut Nunavik" ;;
+		"Irish" ) SAKeyboard="Irish" ;;
+		"IrishExtended" ) SAKeyboard="Irish Extended" ;;
+		"Italian" )
+			case ${Minor} in
+				5 | 6 ) SAKeyboard="Italian" ;;
+				7 | 8 ) SAKeyboard="Italian Typewriter" ;;
+			esac ;;
+		"Italian-Pro" )
+			case ${Minor} in
+				5 | 6 ) SAKeyboard="Italian - Pro" ;;
+				7 | 8 ) SAKeyboard="Italian" ;;
+			esac ;;
+		"Jawi-QWERTY" ) SAKeyboard="Jawi - QWERTY" ;;
+		"Kannada" ) SAKeyboard="Kannada" ;;
+		"Kannada-QWERTY" ) SAKeyboard="Kannada - QWERTY" ;;
+		"Kazakh" ) SAKeyboard="Kazakh" ;;
+		"Khmer" ) SAKeyboard="Khmer" ;;
+		"Japanese.Katakana" ) SAKeyboard="Kotoeri" ; SATypingStyle="Kana" ;;
+		"Japanese.Roman" ) SAKeyboard="Kotoeri" ; SATypingStyle="Romaji" ;;
+		"Kurdish-Sorani" ) SAKeyboard="Kurdish-Sorani" ;;
+		"Latvian" ) SAKeyboard="Latvian" ;;
+		"Lithuanian" ) SAKeyboard="Lithuanian" ;;
+		"Macedonian" ) SAKeyboard="Macedonian" ;;
+		"Malayalam" ) SAKeyboard="Malayalam" ;;
+		"Malayalam-QWERTY" ) SAKeyboard="Malayalam - QWERTY" ;;
+		"Maltese" ) SAKeyboard="Maltese" ;;
+		"Maori" ) SAKeyboard="Maori" ;;
+		"Myanmar-QWERTY" ) SAKeyboard="Myanmar - QWERTY" ;;
+		"Nepali" ) SAKeyboard="Nepali" ;;
+		"NorthernSami" ) SAKeyboard="Northern Sami" ;;
+		"Norwegian" ) SAKeyboard="Norwegian" ;;
+		"NorwegianExtended" ) SAKeyboard="Norwegian Extended" ;;
+		"NorwegianSami-PC" ) SAKeyboard="Norwegian Sami - PC" ;;
+		"Oriya" ) SAKeyboard="Oriya" ;;
+		"Oriya-QWERTY" ) SAKeyboard="Oriya - QWERTY" ;;
+		"Persian" ) SAKeyboard="Persian" ;;
+		"Persian-ISIRI2901" )
+			case ${Minor} in
+				8 ) SAKeyboard="Persian - ISIRI" ;;
+				* ) SAKeyboard="Persian - ISIRI 2901" ;;
+			esac ;;
+		"Persian-QWERTY" ) SAKeyboard="Persian - QWERTY" ;;
+		"Polish" ) SAKeyboard="Polish" ;;
+		"PolishPro" ) SAKeyboard="Polish Pro" ;;
+		"Portuguese" ) SAKeyboard="Portuguese" ;;
+		"Romanian" ) SAKeyboard="Romanian" ;;
+		"Romanian-Standard" ) SAKeyboard="Romanian - Standard" ;;
+		"Russian" ) SAKeyboard="Russian" ;;
+		"RussianWin" ) SAKeyboard="Russian - PC" ;;
+		"Russian-Phonetic" ) SAKeyboard="Russian - Phonetic" ;;
+		"Sami-PC" ) SAKeyboard="Sami - PC" ;;
+		"Serbian" ) SAKeyboard="Serbian" ;;
+		"Serbian-Latin" ) SAKeyboard="Serbian - Latin" ;;
+		"Sinhala" ) SAKeyboard="Sinhala" ;;
+		"Sinhala-QWERTY" ) SAKeyboard="Sinhala - QWERTY" ;;
+		"Slovak" ) SAKeyboard="Slovak" ;;
+		"Slovak-QWERTY" ) SAKeyboard="Slovak - QWERTY" ;;
+		"Slovenian" ) SAKeyboard="Slovenian" ;;
+		"Spanish" ) SAKeyboard="Spanish" ;;
+		"Spanish-ISO" ) SAKeyboard="Spanish - ISO" ;;
+		"Swedish" ) SAKeyboard="Swedish" ;;
+		"Swedish-Pro" ) SAKeyboard="Swedish - Pro" ;;
+		"SwedishSami-PC" ) SAKeyboard="Swedish Sami - PC" ;;
+		"SwissFrench" ) SAKeyboard="Swiss French" ;;
+		"SwissGerman" ) SAKeyboard="Swiss German" ;;
+		"Tamil.AnjalIM" ) SAKeyboard="Tamil Input Method" ; SATypingStyle="Anjal" ;;
+		"Tamil.Tamil99" ) SAKeyboard="Tamil Input Method" ; SATypingStyle="Tamil99" ;;
+		"Telugu" ) SAKeyboard="Telugu" ;;
+		"Telugu-QWERTY" ) SAKeyboard="Telugu - QWERTY" ;;
+		"Thai" ) SAKeyboard="Thai" ;;
+		"Thai-PattaChote" ) SAKeyboard="Thai - PattaChote" ;;
+		"TibetanOtaniUS" ) SAKeyboard="Tibetan - Otani" ;;
+		"Tibetan-QWERTY" ) SAKeyboard="Tibetan - QWERTY" ;;
+		"Tibetan-Wylie" ) SAKeyboard="Tibetan - Wylie" ;;
+		"Turkish" ) SAKeyboard="Turkish" ;;
+		"Turkish-QWERTY" ) SAKeyboard="Turkish - QWERTY" ;;
+		"Turkish-QWERTY-PC" ) SAKeyboard="Turkish - QWERTY PC" ;;
+		"US" ) SAKeyboard="U.S." ;;
+		"USExtended" ) SAKeyboard="U.S. Extended" ;;
+		"USInternational-PC" ) SAKeyboard="U.S. International - PC" ;;
+		"Ukrainian" ) SAKeyboard="Ukrainian" ;;
+		"UnicodeHexInput" ) SAKeyboard="Unicode Hex Input" ;;
+		"Urdu" ) SAKeyboard="Urdu" ;;
+		"Uyghur" ) SAKeyboard="Uyghur" ;;
+		"Uyghur-QWERTY" ) SAKeyboard="Uyghur - QWERTY" ;;
+		"Vietnamese" ) SAKeyboard="Vietnamese" ;;
+		"VietnameseSimpleTelex" ) SAKeyboard="Vietnamese UniKey" ; SATypingStyle="Simple Telex" ;;
+		"VietnameseTelex" ) SAKeyboard="Vietnamese UniKey" ; SATypingStyle="Telex" ;;
+		"VietnameseVIQR" ) SAKeyboard="Vietnamese UniKey" ; SATypingStyle="VIQR" ;;
+		"VietnameseVNI" ) SAKeyboard="Vietnamese UniKey" ; SATypingStyle="VNI" ;;
+		"Welsh" ) SAKeyboard="Welsh" ;;
+	esac
+}
+
+function set_InputSourceIDs {
+	case ${Minor} in
+		5 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Croatian" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "DVORAK-QWERTYCMD" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kazakh" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Dayi" "TCIM.Hanin" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "US" "USExtended" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
+		6 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Croatian" "Croatian-PC" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "Dvorak-Left" "DVORAK-QWERTYCMD" "Dvorak-Right" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kazakh" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Dayi" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "US" "USExtended" "USInternational-PC" "Uyghur-QWERTY" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
+		7 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Bangla" "Bangla-QWERTY" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Colemak" "Croatian" "Croatian-PC" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "Dvorak-Left" "DVORAK-QWERTYCMD" "Dvorak-Right" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-PC" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kannada" "Kannada-QWERTY" "Kazakh" "Khmer" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Kurdish-Sorani" "Latvian" "Lithuanian" "Macedonian" "Malayalam" "Malayalam-QWERTY" "Maltese" "Maori" "Myanmar-QWERTY" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Oriya" "Oriya-QWERTY" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Sinhala" "Sinhala-QWERTY" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Telugu" "Telugu-QWERTY" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "Urdu" "US" "USExtended" "USInternational-PC" "Uyghur-QWERTY" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
+		* ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Bangla" "Bangla-QWERTY" "Belgian" "Brazilian" "British" "British-PC" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Colemak" "Croatian" "Croatian-PC" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "Dvorak-Left" "DVORAK-QWERTYCMD" "Dvorak-Right" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "Georgian-QWERTY" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-PC" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kannada" "Kannada-QWERTY" "Kazakh" "Khmer" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Kurdish-Sorani" "Latvian" "Lithuanian" "Macedonian" "Malayalam" "Malayalam-QWERTY" "Maltese" "Maori" "Myanmar-QWERTY" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Oriya" "Oriya-QWERTY" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Sinhala" "Sinhala-QWERTY" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "TCIM.ZhuyinEten" "Telugu" "Telugu-QWERTY" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "Urdu" "US" "USExtended" "USInternational-PC" "Uyghur" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
+	esac
+}
+
+function refresh_Keyboard {
+	set_InputSourceIDs
+	e=0 ; for ID in "${InputSourceIDs[@]}" ; do if [ "${ID}" == "${InputSourceID}" ] ; then e=1 ; break ; fi ; done
+	if [ ${e} -eq 0 ] ; then InputSourceID="US" ; fi
+	set_SAKeyboard_SATypingStyle "${InputSourceID}"
+}
+
+function get_Keyboard {
+	InputSourceID=`defaults read ~/Library/Preferences/au.com.mondada.SIC "InputSourceID" 2>/dev/null`
+	refresh_Keyboard
+}
+
 function set_AllKeyboards {
 	case ${Minor} in
 		5 ) AllKeyboards=( "Afghan Dari" "Afghan Pashto" "Afghan Uzbek" "Arabic" "Arabic - PC" "Arabic - QWERTY" "Armenian - HM QWERTY" "Armenian - Western QWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian - Phonetic" "Byelorussian" "Canadian English" "Canadian French - CSA" "Cherokee - Nation" "Cherokee - QWERTY" "Croatian" "Czech" "Czech - QWERTY" "Danish" "Devanagari" "Devanagari - QWERTY" "Dutch" "Dvorak" "Dvorak - Qwerty ⌘" "Estonian" "Faroese" "Finnish" "Finnish Extended" "Finnish Sami - PC" "French" "French - Numerical" "German" "Greek" "Greek Polytonic" "Gujarati" "Gujarati - QWERTY" "Gurmukhi" "Gurmukhi - QWERTY" "Hangul" "Hawaiian" "Hebrew" "Hebrew - QWERTY" "Hungarian" "Icelandic" "Inuktitut - Nunavut" "Inuktitut - Nutaaq" "Inuktitut - QWERTY" "Inuttitut Nunavik" "Irish" "Irish Extended" "Italian" "Italian - Pro" "Jawi - QWERTY" "Kazakh" "Kotoeri" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "Northern Sami" "Norwegian" "Norwegian Extended" "Norwegian Sami - PC" "Persian" "Persian - ISIRI 2901" "Persian - QWERTY" "Polish" "Polish Pro" "Portuguese" "Romanian" "Romanian - Standard" "Russian" "Russian - PC" "Russian - Phonetic" "Sami - PC" "Serbian" "Serbian - Latin" "Simplified Chinese" "Slovak" "Slovak - QWERTY" "Slovenian" "Spanish" "Spanish - ISO" "Swedish" "Swedish - Pro" "Swedish Sami - PC" "Swiss French" "Swiss German" "Tamil Input Method" "Thai" "Thai - PattaChote" "Tibetan - Otani" "Tibetan - QWERTY" "Tibetan - Wylie" "Traditional Chinese" "Turkish" "Turkish - QWERTY" "Turkish - QWERTY PC" "U.S." "U.S. Extended" "Ukrainian" "Unicode Hex Input" "Vietnamese" "Vietnamese UniKey" "Welsh" ) ;;
@@ -1219,23 +1449,6 @@ function set_TypingStyles {
 		"Vietnamese UniKey" ) TypingStyles=( "Simple Telex" "VNI" "VIQR" "Telex" ) ;;
 		* ) unset TypingStyles[@] ;;
 	esac
-}
-
-function refresh_Keyboard {
-	set_AllKeyboards
-	e=0 ; for Keyboard in "${AllKeyboards[@]}" ; do if [ "${Keyboard}" == "${SAKeyboard}" ] ; then e=1 ; break ; fi ; done
-	if [ ${e} -eq 0 ] ; then SAKeyboard="U.S." ; unset SATypingStyle ; unset TypingStyles[@] ; return 1 ; fi
-	set_TypingStyles "${SAKeyboard}"
-	if [ ${#TypingStyles[@]} -gt 0 ] ; then
-		e=0 ; for TypingStyle in "${TypingStyles[@]}" ; do if [ "${TypingStyle}" == "${SATypingStyle}" ] ; then e=1 ; break ; fi ; done
-		if [ ${e} -eq 0 ] ; then SAKeyboard="U.S." ; unset TypingStyles[@] ; return 1 ; fi
-	fi
-}
-
-function get_Keyboard {
-	SAKeyboard=`defaults read ~/Library/Preferences/au.com.mondada.SIC "SAKeyboard" 2>/dev/null`
-	SATypingStyle=`defaults read ~/Library/Preferences/au.com.mondada.SIC "SATypingStyle" 2>/dev/null`
-	refresh_Keyboard
 }
 
 function set_CurrentKeyboards {
@@ -2071,7 +2284,7 @@ function set_SelectedInputSource {
 		"Kannada - QWERTY" ) SelectedInputSource=1 ;;
 		"Kazakh" ) SelectedInputSource=1 ;;
 		"Khmer" ) SelectedInputSource=1 ;;
-		"Kana" ) SelectedInputSource=2 ;;
+		"Kana" ) SelectedInputSource=3 ;;
 		"Romaji" ) SelectedInputSource=2 ;;
 		"Kurdish-Sorani" ) SelectedInputSource=1 ;;
 		"Macedonian" ) SelectedInputSource=1 ;;
@@ -2316,13 +2529,196 @@ function set_DefaultAsciiInputSource {
 	fi
 }
 
+function set_InputSourceID {
+	# ${1}: SAKeyboard
+	# ${1}: SATypingStyle
+	unset InputSourceID
+	case "${1}" in
+		"Afghan Dari" ) InputSourceID="AfghanDari" ;;
+		"Afghan Pashto" ) InputSourceID="AfghanPashto" ;;
+		"Afghan Uzbek" ) InputSourceID="AfghanUzbek" ;;
+		"Arabic" ) InputSourceID="Arabic" ;;
+		"Arabic - PC" ) InputSourceID="ArabicPC" ;;
+		"Arabic - QWERTY" ) InputSourceID="Arabic-QWERTY" ;;
+		"Armenian - HM QWERTY" ) InputSourceID="Armenian-HMQWERTY" ;;
+		"Armenian - Western QWERTY" ) InputSourceID="Armenian-WesternQWERTY" ;;
+		"Australian" ) InputSourceID="Australian" ;;
+		"Austrian" ) InputSourceID="Austrian" ;;
+		"Azeri" ) InputSourceID="Azeri" ;;
+		"Bangla" ) InputSourceID="Bangla" ;;
+		"Bangla - Qwerty" ) InputSourceID="Bangla-QWERTY" ;;
+		"Belgian" ) InputSourceID="Belgian" ;;
+		"Brazilian" ) InputSourceID="Brazilian" ;;
+		"British" ) InputSourceID="British" ;;
+		"British - PC" ) InputSourceID="British-PC" ;;
+		"Bulgarian" ) InputSourceID="Bulgarian" ;;
+		"Bulgarian - Phonetic" ) InputSourceID="Bulgarian-Phonetic" ;;
+		"Byelorussian" ) InputSourceID="Byelorussian" ;;
+		"Canadian English" ) InputSourceID="Canadian" ;;
+		"Canadian French - CSA" ) InputSourceID="Canadian-CSA" ;;
+		"Cherokee - Nation" ) InputSourceID="Cherokee-Nation" ;;
+		"Cherokee - QWERTY" ) InputSourceID="Cherokee-QWERTY" ;;
+		"Simplified Chinese" | "Chinese - Simplified" )
+			case "${2}" in
+				"ITABC" | "Pinyin - Simplified" ) InputSourceID="SCIM.ITABC" ;;
+				"Wubi Hua" ) InputSourceID="SCIM.WBH" ;;
+				"Wubi Xing" ) InputSourceID="SCIM.WBX" ;;
+			esac ;;
+		"Traditional Chinese" | "Chinese - Traditional" )
+			case "${2}" in
+				"Cangjie" ) InputSourceID="TCIM.Cangjie" ;;
+				"Dayi(Pro)" | "Dayi Pro" ) InputSourceID="TCIM.Dayi" ;;
+				"Hanin" ) InputSourceID="TCIM.Hanin" ;;
+				"Pinyin" | "Pinyin - Traditional" ) InputSourceID="TCIM.Pinyin" ;;
+				"Jianyi" | "Sucheng" ) InputSourceID="TCIM.Jianyi" ;;
+				"Zhuyin" ) InputSourceID="TCIM.Zhuyin" ;;
+				"Zhuyin - Eten" ) InputSourceID="TCIM.ZhuyinEten" ;;
+			esac ;;
+		"Colemak" ) InputSourceID="Colemak" ;;
+		"Croatian" ) InputSourceID="Croatian" ;;
+		"Croatian - PC" ) InputSourceID="Croatian-PC" ;;
+		"Czech" ) InputSourceID="Czech" ;;
+		"Czech - QWERTY" ) InputSourceID="Czech-QWERTY" ;;
+		"Danish" ) InputSourceID="Danish" ;;
+		"Devanagari" ) InputSourceID="Devanagari" ;;
+		"Devanagari - QWERTY" ) InputSourceID="Devanagari-QWERTY" ;;
+		"Dutch" ) InputSourceID="Dutch" ;;
+		"Dvorak" ) InputSourceID="Dvorak" ;;
+		"Dvorak - Left" ) InputSourceID="Dvorak-Left" ;;
+		"Dvorak - Qwerty ⌘" ) InputSourceID="DVORAK-QWERTYCMD" ;;
+		"Dvorak - Right" ) InputSourceID="Dvorak-Right" ;;
+		"Estonian" ) InputSourceID="Estonian" ;;
+		"Faroese" ) InputSourceID="Faroese" ;;
+		"Finnish" ) InputSourceID="Finnish" ;;
+		"Finnish Extended" ) InputSourceID="FinnishExtended" ;;
+		"Finnish Sami - PC" ) InputSourceID="FinnishSami-PC" ;;
+		"French" ) InputSourceID="French" ;;
+		"French - Numerical" ) InputSourceID="French-numerical" ;;
+		"Georgian - QWERTY" ) InputSourceID="Georgian-QWERTY" ;;
+		"German" ) InputSourceID="German" ;;
+		"Greek" ) InputSourceID="Greek" ;;
+		"Greek Polytonic" ) InputSourceID="GreekPolytonic" ;;
+		"Gujarati" ) InputSourceID="Gujarati" ;;
+		"Gujarati - QWERTY" ) InputSourceID="Gujarati-QWERTY" ;;
+		"Gurmukhi" ) InputSourceID="Gurmukhi" ;;
+		"Gurmukhi - QWERTY" ) InputSourceID="Gurmukhi-QWERTY" ;;
+		"Hangul" )
+			case "${2}" in
+				"2-Set Korean" ) InputSourceID="Korean.2SetKorean" ;;
+				"3-Set Korean" ) InputSourceID="Korean.3SetKorean" ;;
+				"390 Sebulshik" ) InputSourceID="Korean.390Sebulshik" ;;
+				"GongjinCheong Romaja" ) InputSourceID="Korean.GongjinCheongRomaja" ;;
+				"HNC Romaja" ) InputSourceID="Korean.HNCRomaja" ;;
+			esac ;;
+		"Hawaiian" ) InputSourceID="Hawaiian" ;;
+		"Hebrew" ) InputSourceID="Hebrew" ;;
+		"Hebrew - PC" ) InputSourceID="Hebrew-PC" ;;
+		"Hebrew - QWERTY" ) InputSourceID="Hebrew-QWERTY" ;;
+		"Hungarian" ) InputSourceID="Hungarian" ;;
+		"Icelandic" ) InputSourceID="Icelandic" ;;
+		"Inuktitut - Nunavut" ) InputSourceID="Inuktitut-Nunavut" ;;
+		"Inuktitut - Nutaaq" ) InputSourceID="Inuktitut-Nutaaq" ;;
+		"Inuktitut - QWERTY" ) InputSourceID="Inuktitut-QWERTY" ;;
+		"Inuttitut Nunavik" ) InputSourceID="InuttitutNunavik" ;;
+		"Irish" ) InputSourceID="Irish" ;;
+		"Irish Extended" ) InputSourceID="IrishExtended" ;;
+		"Italian" )
+			case ${Minor} in
+				5 | 6 ) InputSourceID="Italian" ;;
+				* ) InputSourceID="Italian-Pro" ;;
+			esac ;;
+		"Italian Typewriter" ) InputSourceID="Italian" ;;
+		"Italian - Pro" ) InputSourceID="Italian-Pro" ;;
+		"Jawi - QWERTY" ) InputSourceID="Jawi-QWERTY" ;;
+		"Kannada" ) InputSourceID="Kannada" ;;
+		"Kannada - QWERTY" ) InputSourceID="Kannada-QWERTY" ;;
+		"Kazakh" ) InputSourceID="Kazakh" ;;
+		"Khmer" ) InputSourceID="Khmer" ;;
+		"Kotoeri" )
+			case "${2}" in
+				"Kana" ) InputSourceID="Japanese.Katakana" ;;
+				"Romaji" ) InputSourceID="Japanese.Roman" ;;
+			esac ;;
+		"Kurdish-Sorani" ) InputSourceID="Kurdish-Sorani" ;;
+		"Latvian" ) InputSourceID="Latvian" ;;
+		"Lithuanian" ) InputSourceID="Lithuanian" ;;
+		"Macedonian" ) InputSourceID="Macedonian" ;;
+		"Malayalam" ) InputSourceID="Malayalam" ;;
+		"Malayalam - QWERTY" ) InputSourceID="Malayalam-QWERTY" ;;
+		"Maltese" ) InputSourceID="Maltese" ;;
+		"Maori" ) InputSourceID="Maori" ;;
+		"Myanmar - QWERTY" ) InputSourceID="Myanmar-QWERTY" ;;
+		"Nepali" ) InputSourceID="Nepali" ;;
+		"Northern Sami" ) InputSourceID="NorthernSami" ;;
+		"Norwegian" ) InputSourceID="Norwegian" ;;
+		"Norwegian Extended" ) InputSourceID="NorwegianExtended" ;;
+		"Norwegian Sami - PC" ) InputSourceID="NorwegianSami-PC" ;;
+		"Oriya" ) InputSourceID="Oriya" ;;
+		"Oriya - QWERTY" ) InputSourceID="Oriya-QWERTY" ;;
+		"Persian" ) InputSourceID="Persian" ;;
+		"Persian - ISIRI 2901" | "Persian - ISIRI" ) InputSourceID="Persian-ISIRI2901" ;;
+		"Persian - QWERTY" ) InputSourceID="Persian-QWERTY" ;;
+		"Polish" ) InputSourceID="Polish" ;;
+		"Polish Pro" ) InputSourceID="PolishPro" ;;
+		"Portuguese" ) InputSourceID="Portuguese" ;;
+		"Romanian" ) InputSourceID="Romanian" ;;
+		"Romanian - Standard" ) InputSourceID="Romanian-Standard" ;;
+		"Russian" ) InputSourceID="Russian" ;;
+		"Russian - PC" ) InputSourceID="RussianWin" ;;
+		"Russian - Phonetic" ) InputSourceID="Russian-Phonetic" ;;
+		"Sami - PC" ) InputSourceID="Sami-PC" ;;
+		"Serbian" ) InputSourceID="Serbian" ;;
+		"Serbian - Latin" ) InputSourceID="Serbian-Latin" ;;
+		"Sinhala" ) InputSourceID="Sinhala" ;;
+		"Sinhala - QWERTY" ) InputSourceID="Sinhala-QWERTY" ;;
+		"Slovak" ) InputSourceID="Slovak" ;;
+		"Slovak - QWERTY" ) InputSourceID="Slovak-QWERTY" ;;
+		"Slovenian" ) InputSourceID="Slovenian" ;;
+		"Spanish" ) InputSourceID="Spanish" ;;
+		"Spanish - ISO" ) InputSourceID="Spanish-ISO" ;;
+		"Swedish" ) InputSourceID="Swedish" ;;
+		"Swedish - Pro" ) InputSourceID="Swedish-Pro" ;;
+		"Swedish Sami - PC" ) InputSourceID="SwedishSami-PC" ;;
+		"Swiss French" ) InputSourceID="SwissFrench" ;;
+		"Swiss German" ) InputSourceID="SwissGerman" ;;
+		"Tamil Input Method" )
+			case "${2}" in
+				"Anjal" ) InputSourceID="Tamil.AnjalIM" ;;
+				"Tamil99" ) InputSourceID="Tamil.Tamil99" ;;
+			esac ;;
+		"Telugu" ) InputSourceID="Telugu" ;;
+		"Telugu - QWERTY" ) InputSourceID="Telugu-QWERTY" ;;
+		"Thai" ) InputSourceID="Thai" ;;
+		"Thai - PattaChote" ) InputSourceID="Thai-PattaChote" ;;
+		"Tibetan - Otani" ) InputSourceID="TibetanOtaniUS" ;;
+		"Tibetan - QWERTY" ) InputSourceID="Tibetan-QWERTY" ;;
+		"Tibetan - Wylie" ) InputSourceID="Tibetan-Wylie" ;;
+		"Turkish" ) InputSourceID="Turkish" ;;
+		"Turkish - QWERTY" ) InputSourceID="Turkish-QWERTY" ;;
+		"Turkish - QWERTY PC" ) InputSourceID="Turkish-QWERTY-PC" ;;
+		"U.S." ) InputSourceID="US" ;;
+		"U.S. Extended" ) InputSourceID="USExtended" ;;
+		"U.S. International - PC" ) InputSourceID="USInternational-PC" ;;
+		"Ukrainian" ) InputSourceID="Ukrainian" ;;
+		"Unicode Hex Input" ) InputSourceID="UnicodeHexInput" ;;
+		"Urdu" ) InputSourceID="Urdu" ;;
+		"Uyghur" ) InputSourceID="Uyghur" ;;
+		"Uyghur - QWERTY" ) InputSourceID="Uyghur-QWERTY" ;;
+		"Vietnamese" ) InputSourceID="Vietnamese" ;;
+		"Vietnamese UniKey" )
+			case "${2}" in
+				"Simple Telex" ) InputSourceID="VietnameseSimpleTelex" ;;
+				"Telex" ) InputSourceID="VietnameseTelex" ;;
+				"VIQR" ) InputSourceID="VietnameseVIQR" ;;
+				"VNI" ) InputSourceID="VietnameseVNI" ;;
+			esac ;;
+		"Welsh" ) InputSourceID="Welsh" ;;
+	esac
+}
+
 function save_Keyboard {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "SAKeyboard" -string "${SAKeyboard}"
-	if [ -n "${SATypingStyle}" ] ; then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "SATypingStyle" -string "${SATypingStyle}"
-	else
-		defaults delete ~/Library/Preferences/au.com.mondada.SIC "SATypingStyle" 2>/dev/null
-	fi
+	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "InputSourceID" -string "${InputSourceID}"
 }
 
 # Section: Location Services
@@ -3182,7 +3578,7 @@ function set_TZFiles {
 		"East Africa Time" ) TZFiles=( "Africa/Addis_Ababa" "Africa/Asmara" "Africa/Asmera" "Africa/Dar_es_Salaam" "Africa/Djibouti" "Africa/Kampala" "Africa/Khartoum" "Africa/Mogadishu" "Africa/Nairobi" "Indian/Antananarivo" "Indian/Comoro" "Indian/Mayotte" ) ;;
 		"East Kazakhstan Standard Time" ) TZFiles=( "Asia/Almaty" "Asia/Qyzylorda" ) ;;
 		"East Timor Time" ) TZFiles=( "Asia/Dili" ) ;;
-		"Eastern European Time" ) TZFiles=( "Africa/Cairo" "Africa/Tripoli" "Asia/Amman" "Asia/Beirut" "Asia/Damascus" "Asia/Gaza" "Asia/Nicosia" "Europe/Athens" "Europe/Bucharest" "Europe/Chisinau" "Europe/Helsinki" "Europe/Istanbul" "Europe/Kiev" "Europe/Riga" "Europe/Simferopol" "Europe/Sofia" "Europe/Tallinn" "Europe/Uzhgorod" "Europe/Vilnius" "Europe/Zaporozhye" ) ; if [ ${OSMinorVersion} -eq 6 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Kaliningrad" "Europe/Minsk" ) ; fi ;;
+		"Eastern European Time" ) TZFiles=( "Africa/Cairo" "Africa/Tripoli" "Asia/Amman" "Asia/Beirut" "Asia/Damascus" "Asia/Gaza" "Asia/Nicosia" "Europe/Athens" "Europe/Bucharest" "Europe/Chisinau" "Europe/Helsinki" "Europe/Istanbul" "Europe/Kiev" "Europe/Riga" "Europe/Simferopol" "Europe/Sofia" "Europe/Tallinn" "Europe/Uzhgorod" "Europe/Vilnius" "Europe/Zaporozhye" ) ; if [ ${Minor} -eq 6 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Kaliningrad" "Europe/Minsk" ) ; fi ;;
 		"Eastern Indonesia Time" ) TZFiles=( "Asia/Jayapura" ) ;;
 		"Eastern Standard Time" ) TZFiles=( "America/Cayman" "America/Detroit" "America/Grand_Turk" "America/Indiana/Indianapolis" "America/Indiana/Vincennes" "America/Indianapolis" "America/Jamaica" "America/Kentucky/Louisville" "America/Kentucky/Monticello" "America/Montreal" "America/Nassau" "America/New_York" "America/Nipigon" "America/Panama" "America/Port-au-Prince" "America/Thunder_Bay" "America/Toronto" "Canada/Eastern" "US/Eastern" ) ;;
 		"Ecuador Time" ) TZFiles=( "America/Guayaquil" ) ;;
@@ -3210,14 +3606,14 @@ function set_TZFiles {
 		"Israel Standard Time" ) TZFiles=( "Asia/Jerusalem" ) ;;
 		"Japan Standard Time" ) TZFiles=( "Asia/Tokyo" ) ;;
 		"Korean Standard Time" ) TZFiles=( "Asia/Pyongyang" "Asia/Seoul" ) ;;
-		"Krasnoyarsk Time" ) TZFiles=( "Asia/Krasnoyarsk" ) ; if [ ${OSMinorVersion} -ne 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
+		"Krasnoyarsk Time" ) TZFiles=( "Asia/Krasnoyarsk" ) ; if [ ${Minor} -ne 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
 		"Kyrgyzstan Time" ) TZFiles=( "Asia/Bishkek" ) ;;
-		"Magadan Time" ) TZFiles=( "Asia/Magadan" ) ; if [ ${OSMinorVersion} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Anadyr" "Asia/Kamchatka" ) ; fi ;;
+		"Magadan Time" ) TZFiles=( "Asia/Magadan" ) ; if [ ${Minor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Anadyr" "Asia/Kamchatka" ) ; fi ;;
 		"Malaysia Time" ) TZFiles=( "Asia/Kuala_Lumpur" "Asia/Kuching" ) ;;
 		"Maldives Time" ) TZFiles=( "Indian/Maldives" ) ;;
 		"Marshall Islands Time" ) TZFiles=( "Pacific/Majuro" ) ;;
 		"Mauritius Time" ) TZFiles=( "Indian/Mauritius" ) ;;
-		"Moscow Standard Time" ) TZFiles=( "Europe/Moscow" ) ; if [ ${OSMinorVersion} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Samara" ) ; fi ;;
+		"Moscow Standard Time" ) TZFiles=( "Europe/Moscow" ) ; if [ ${Minor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Samara" ) ; fi ;;
 		"Mountain Standard Time" ) TZFiles=( "America/Boise" "America/Chihuahua" "America/Dawson_Creek" "America/Denver" "America/Edmonton" "America/Hermosillo" "America/Mazatlan" "America/Ojinaga" "America/Phoenix" "America/Yellowknife" "Canada/Mountain" "US/Mountain" ) ;;
 		"Myanmar Time" ) TZFiles=( "Asia/Rangoon" ) ;;
 		"Nauru Time" ) TZFiles=( "Pacific/Nauru" ) ;;
@@ -3227,7 +3623,7 @@ function set_TZFiles {
 		"Newfoundland Standard Time" ) TZFiles=( "America/St_Johns" "Canada/Newfoundland" ) ;;
 		"Niue Time" ) TZFiles=( "Pacific/Niue" ) ;;
 		"Norfolk Islands Time" ) TZFiles=( "Pacific/Norfolk" ) ;;
-		"Novosibirsk Time" ) TZFiles=( "Asia/Novokuznetsk" ) ; if [ ${OSMinorVersion} -eq 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
+		"Novosibirsk Time" ) TZFiles=( "Asia/Novokuznetsk" ) ; if [ ${Minor} -eq 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
 		"Omsk Time" ) TZFiles=( "Asia/Omsk" ) ;;
 		"Pacific Standard Time" ) TZFiles=( "America/Los_Angeles" "America/Santa_Isabel" "America/Tijuana" "America/Vancouver" "America/Whitehorse" "US/Pacific" ) ;;
 		"Pakistan Time" ) TZFiles=( "Asia/Karachi" ) ;;
@@ -3502,6 +3898,7 @@ function display_Keyboard {
 }
 
 function select_Keyboard {
+	set_AllKeyboards
 	set_CurrentKeyboards "${LanguageCode}" "${SACountryCode}"
 	Keyboards=( "Show All" "${CurrentKeyboards[@]}" )
 	display_Subtitle "Select Keyboard"
@@ -3531,6 +3928,7 @@ function select_Keyboard {
 		done
 		SATypingStyle="${TypingStyle}"
 	fi
+	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
 }
 
 function display_LocationServices {
