@@ -1,13 +1,40 @@
 #!/bin/sh
 
+function not_Implemented {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
 
-Target="${1}"
-
+# Default Base Folder
+BaseFolder="/Users/Shared/SIC"
+# Default Configurations Folder
+ConfigurationFolder="${BaseFolder}/Configurations"
+# Default Library Folder
+LibraryFolder="${BaseFolder}/Library"
+# Default Packages Folder
+PackageFolder="${BaseFolder}/Packages"
+# Default Masters Folder
+MasterFolder="${BaseFolder}/Masters"
+# Default Image Size (GB)
+ImageSize="56.5"
+# Minimum Image Size
+minImageSize="5"
+# Maximum Image Size
+maxImageSize="2048"
+# Default Volume Name
+VolumeName="Macintosh HD"
+# Default Export Option for Recovery Partition (Include in Master)
+ExportType=1
+# Default for ASR Scan on Masters
+ScanImage=1
 # FirstBoot Script Path
 FirstBootPath="/usr/libexec/FirstBoot"
 
 # Version
 SICVersion="1.5a0"
+
+# ${0}:	Path to this script
+ScriptName=`basename "${0}"`
 
 # Section: Common
 
@@ -25,6 +52,14 @@ function display_Subtitle {
 	printf "\n\033[1m${1}\033[m\n\n"
 }
 
+function privelege_Check {
+	if [ `id -u` -ne 0 ] ; then
+		display_Title
+		printf "\n${ScriptName} must be run with root privileges, exiting.\n\n"
+		exit 1
+	fi
+}
+
 function display_Options {
 	# ${1}:	Text above selection list
 	# ${2}:	Text for prompt
@@ -39,12 +74,21 @@ function press_anyKey {
 	echo
 }
 
-function set_OSVersion {
-	Major=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $1}'`
-	Minor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
-	Point=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $3}'`
-	Build=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductBuildVersion"`
-	case ${Minor} in
+function set_SystemOSVersion {
+	SystemOSMajor=`sw_vers -productVersion | awk -F "." '{print $1}'`
+	SystemOSMinor=`sw_vers -productVersion | awk -F "." '{print $2}'`
+	SystemOSPoint=`sw_vers -productVersion | awk -F "." '{print $3}'`
+	if [ -z "${SystemOSPoint}" ] ; then SystemOSPoint=0 ; fi
+	SystemOSBuild=`sw_vers -buildVersion`
+}
+
+function set_TargetOSVersion {
+	TargetOSMajor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $1}'`
+	TargetOSMinor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
+	TargetOSPoint=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $3}'`
+	if [ -z "${TargetOSPoint}" ] ; then TargetOSPoint=0 ; fi
+	TargetOSBuild=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductBuildVersion"`
+	case ${TargetOSMinor} in
 		6 | 7 ) PLACES="ZGEOPLACE" ;;
 		8 ) PLACES="ZGEOKITPLACE" ;;
 	esac
@@ -130,10 +174,10 @@ function set_Target {
 
 function set_Languages {
 	Languages=( "English" "Japanese" "French" "German" "Spanish" "Italian" "Portuguese" "Portuguese (Portugal)" "Dutch" "Swedish" "Norwegian" "Danish" "Finnish" "Russian" "Polish" )
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		8 ) Languages=( "${Languages[@]}" "Turkish" "Chinese (Simplified)" "Chinese (Traditional)" "Korean" "Arabic" "Czech" "Hungarian" "Catalan" "Croatian" "Romanian" "Hebrew" "Ukrainian" "Thai" "Slovak" "Greek" ) ;;
 		7 ) Languages=( "${Languages[@]}" "Turkish" "Chinese (Simplified)" "Chinese (Traditional)" "Korean" "Arabic" "Czech" "Hungarian" )
-			if [ ${Point} -ge 3 ] ; then
+			if [ ${TargetOSPoint} -ge 3 ] ; then
 				Languages=( "${Languages[@]}" "Catalan" "Croatian" "Romanian" "Hebrew" "Ukrainian" "Thai" "Slovak" "Greek" )
 			fi ;;
 		* ) Languages=( "${Languages[@]}" "Chinese (Simplified)" "Chinese (Traditional)" "Korean" ) ;;
@@ -227,7 +271,7 @@ function set_Localization {
 
 function set_AppleLanguages {
 	# ${1}: Language Code
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		8 ) AppleLanguages=( "ar" "ca" "cs" "da" "nl" "el" "en" "fi" "fr" "de" "he" "hr" "hu" "it" "ja" "ko" "nb" "pl" "pt" "pt-PT" "ro" "ru" "sk" "es" "sv" "th" "tr" "uk" "zh-Hans" "zh-Hant" ) ;;
 		* ) AppleLanguages=( "en" "ja" "fr" "de" "es" "it" "nl" "sv" "nb" "da" "fi" "pl" "pt" "pt-PT" "ru" "zh-Hans" "zh-Hant" "ko" ) ;;
 	esac
@@ -272,7 +316,7 @@ function save_Language {
 # Section: Country
 
 function set_AllCountryCodes {
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		5 ) AllCountryCodes=( "AD" "AE" "AF" "AG" "AI" "AL" "AM" "AN" "AO" "AQ" "AR" "AS" "AT" "AU" "AW" "AZ" "BA" "BB" "BD" "BE" "BF" "BG" "BH" "BI" "BJ" "BM" "BN" "BO" "BR" "BS" "BT" "BV" "BW" "BY" "BZ" "CA" "CC" "CD" "CF" "CG" "CH" "CI" "CK" "CL" "CM" "CN" "CO" "CR" "CV" "CX" "CY" "CZ" "DE" "DJ" "DK" "DM" "DO" "DZ" "EC" "EE" "EG" "EH" "ER" "ES" "ET" "FI" "FJ" "FK" "FM" "FO" "FR" "GA" "GB" "GD" "GE" "GF" "GH" "GI" "GL" "GM" "GN" "GP" "GQ" "GR" "GS" "GT" "GU" "GW" "GY" "HK" "HM" "HN" "HR" "HT" "HU" "ID" "IE" "IL" "IN" "IO" "IQ" "IS" "IT" "JM" "JO" "JP" "KE" "KG" "KH" "KI" "KM" "KN" "KR" "KW" "KY" "KZ" "LA" "LB" "LC" "LI" "LK" "LR" "LS" "LT" "LU" "LV" "MA" "MC" "MD" "MG" "MH" "MK" "ML" "MM" "MN" "MO" "MP" "MQ" "MR" "MS" "MT" "MU" "MV" "MW" "MX" "MY" "MZ" "NA" "NC" "NE" "NF" "NG" "NI" "NL" "NO" "NP" "NR" "NU" "NZ" "OM" "PA" "PE" "PF" "PG" "PH" "PK" "PL" "PM" "PN" "PR" "PS" "PT" "PW" "PY" "QA" "RE" "RO" "RU" "RW" "SA" "SB" "SC" "SE" "SG" "SH" "SI" "SJ" "SK" "SL" "SM" "SN" "SO" "SR" "ST" "SV" "SZ" "TC" "TD" "TF" "TG" "TH" "TJ" "TK" "TM" "TN" "TO" "TP" "TR" "TT" "TV" "TW" "TZ" "UA" "UG" "UM" "US" "UY" "UZ" "VA" "VC" "VE" "VG" "VI" "VN" "VU" "WF" "WS" "YE" "YT" "YU" "ZA" "ZM" "ZW" ) ;;
 		6 ) AllCountryCodes=( "AD" "AE" "AF" "AG" "AI" "AL" "AM" "AN" "AO" "AQ" "AR" "AS" "AT" "AU" "AW" "AZ" "BA" "BB" "BD" "BE" "BF" "BG" "BH" "BI" "BJ" "BM" "BN" "BO" "BR" "BS" "BT" "BV" "BW" "BY" "BZ" "CA" "CC" "CD" "CF" "CG" "CH" "CI" "CK" "CL" "CM" "CN" "CO" "CR" "CV" "CX" "CY" "CZ" "DE" "DJ" "DK" "DM" "DO" "DZ" "EC" "EE" "EG" "EH" "ER" "ES" "ET" "FI" "FJ" "FK" "FM" "FO" "FR" "GA" "GB" "GD" "GE" "GF" "GH" "GI" "GL" "GM" "GN" "GP" "GQ" "GR" "GS" "GT" "GU" "GW" "GY" "HK" "HM" "HN" "HR" "HT" "HU" "ID" "IE" "IL" "IN" "IO" "IQ" "IS" "IT" "JM" "JO" "JP" "KE" "KG" "KH" "KI" "KM" "KN" "KR" "KW" "KY" "KZ" "LA" "LB" "LC" "LI" "LK" "LR" "LS" "LT" "LU" "LV" "MA" "MC" "MD" "ME" "MG" "MH" "MK" "ML" "MM" "MN" "MO" "MP" "MQ" "MR" "MS" "MT" "MU" "MV" "MW" "MX" "MY" "MZ" "NA" "NC" "NE" "NF" "NG" "NI" "NL" "NO" "NP" "NR" "NU" "NZ" "OM" "PA" "PE" "PF" "PG" "PH" "PK" "PL" "PM" "PN" "PR" "PS" "PT" "PW" "PY" "QA" "RE" "RO" "RU" "RS" "RW" "SA" "SB" "SC" "SE" "SG" "SH" "SI" "SJ" "SK" "SL" "SM" "SN" "SO" "SR" "ST" "SV" "SZ" "TC" "TD" "TF" "TG" "TH" "TJ" "TK" "TM" "TN" "TO" "TR" "TT" "TV" "TW" "TZ" "UA" "UG" "UM" "US" "UY" "UZ" "VA" "VC" "VE" "VG" "VI" "VN" "VU" "WF" "WS" "YE" "YT" "ZA" "ZM" "ZW" ) ;;
 		* ) AllCountryCodes=( "AD" "AE" "AF" "AG" "AI" "AL" "AM" "AN" "AO" "AQ" "AR" "AS" "AT" "AU" "AW" "AZ" "BA" "BB" "BD" "BE" "BF" "BG" "BH" "BI" "BJ" "BM" "BN" "BO" "BR" "BS" "BT" "BV" "BW" "BY" "BZ" "CA" "CC" "CD" "CF" "CG" "CH" "CI" "CK" "CL" "CM" "CN" "CO" "CR" "CV" "CX" "CY" "CZ" "DE" "DJ" "DK" "DM" "DO" "DZ" "EC" "EE" "EG" "EH" "ER" "ES" "ET" "FI" "FJ" "FK" "FM" "FO" "FR" "GA" "GB" "GD" "GE" "GF" "GH" "GI" "GL" "GM" "GN" "GP" "GQ" "GR" "GS" "GT" "GU" "GW" "GY" "HK" "HM" "HN" "HR" "HT" "HU" "ID" "IE" "IL" "IN" "IO" "IQ" "IS" "IT" "JM" "JO" "JP" "KE" "KG" "KH" "KI" "KM" "KN" "KR" "KW" "KY" "KZ" "LA" "LB" "LC" "LI" "LK" "LR" "LS" "LT" "LU" "LV" "MA" "MC" "MD" "ME" "MG" "MH" "MK" "ML" "MM" "MN" "MO" "MP" "MQ" "MR" "MS" "MT" "MU" "MV" "MW" "MX" "MY" "MZ" "NA" "NC" "NE" "NF" "NG" "NI" "NL" "NO" "NP" "NR" "NU" "NZ" "OM" "PA" "PE" "PF" "PG" "PH" "PK" "PL" "PM" "PN" "PR" "PS" "PT" "PW" "PY" "QA" "RE" "RO" "RS" "RU" "RW" "SA" "SB" "SC" "SE" "SG" "SH" "SI" "SJ" "SK" "SL" "SM" "SN" "SO" "SR" "ST" "SV" "SZ" "TC" "TD" "TF" "TG" "TH" "TJ" "TK" "TM" "TN" "TO" "TR" "TT" "TV" "TW" "TZ" "UA" "UG" "UM" "US" "UY" "UZ" "VA" "VC" "VE" "VG" "VI" "VN" "VU" "WF" "WS" "YE" "YT" "ZA" "ZM" "ZW" ) ;;
@@ -669,7 +713,7 @@ function refresh_Country {
 	set_AllCountryCodes
 	e=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${SACountryCode}" ] ; then e=1 ; break ; fi ; done
 	if [ ${e} -eq 0 ] ; then SACountryCode="US" ; fi
-	SACountry=`convert_SACountryCodeToName ${Minor} "${SACountryCode}"`
+	SACountry=`convert_SACountryCodeToName ${TargetOSMinor} "${SACountryCode}"`
 }
 
 function get_CountryCode {
@@ -693,7 +737,7 @@ function set_LanguageCountryNames {
 	unset LanguageCountryNames[@]
 	IFS=$'\n'
 	for Code in "${LanguageCountryCodes[@]}" ; do
-		LanguageCountryNames=( "${LanguageCountryNames[@]}" $(convert_SACountryCodeToName ${Minor} "${Code}") )
+		LanguageCountryNames=( "${LanguageCountryNames[@]}" $(convert_SACountryCodeToName ${TargetOSMinor} "${Code}") )
 	done
 	unset IFS
 }
@@ -712,7 +756,7 @@ function set_OtherCountryNames {
 	unset OtherCountryNames[@]
 	IFS=$'\n'
 	for Code in "${OtherCountryCodes[@]}" ; do
-		OtherCountryNames=( "${OtherCountryNames[@]}" $(convert_SACountryCodeToName ${Minor} "${Code}") )
+		OtherCountryNames=( "${OtherCountryNames[@]}" $(convert_SACountryCodeToName ${TargetOSMinor} "${Code}") )
 	done
 	OtherCountryNames=( `for COUNTRY in "${OtherCountryNames[@]}" ; do echo "${COUNTRY}" ; done | sort -u` )
 	unset IFS
@@ -964,13 +1008,13 @@ function set_ResourceID {
 	# ${2}: Country Code
 	unset ResourceID
 	case "${1}" in
-		"ja" ) case ${Minor} in
+		"ja" ) case ${TargetOSMinor} in
 			5 ) ResourceID=16384 ;;
 			* ) case "${2}" in
 				"JP" ) ResourceID=16384 ;;
 			esac ;;
 		esac ;;
-		"fr" ) case ${Minor} in
+		"fr" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"CA" ) ResourceID=11 ;;
 				"CH" ) ResourceID=18 ;;
@@ -987,7 +1031,7 @@ function set_ResourceID {
 				"FR" ) ResourceID=1 ;;
 			esac ;;
 		esac ;;
-		"de" ) case ${Minor} in
+		"de" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"AT" ) ResourceID=92 ;;
 				"CH" ) ResourceID=19 ;;
@@ -1004,7 +1048,7 @@ function set_ResourceID {
 				"DE" ) ResourceID=3 ;;
 			esac ;;
 		esac ;;
-		"es" ) case ${Minor} in
+		"es" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"FR" ) ResourceID=1 ;;
@@ -1017,7 +1061,7 @@ function set_ResourceID {
 				"ES" ) ResourceID=8 ;;
 			esac ;;
 		esac ;;
-		"it" ) case ${Minor} in
+		"it" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"CH" ) ResourceID=36 ;;
 				"DE" ) ResourceID=3 ;;
@@ -1032,7 +1076,7 @@ function set_ResourceID {
 				"IT" ) ResourceID=4 ;;
 			esac ;;
 		esac ;;
-		"pt" ) case ${Minor} in
+		"pt" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1048,7 +1092,7 @@ function set_ResourceID {
 				"PT" ) ResourceID=10 ;;
 			esac ;;
 		esac ;;
-		"pt-PT" ) case ${Minor} in
+		"pt-PT" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1062,7 +1106,7 @@ function set_ResourceID {
 				"PT" ) ResourceID=10 ;;
 			esac ;;
 		esac ;;
-		"nl" ) case ${Minor} in
+		"nl" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"BE" ) ResourceID=6 ;;
 				"DE" ) ResourceID=3 ;;
@@ -1078,7 +1122,7 @@ function set_ResourceID {
 				"NL" ) ResourceID=5 ;;
 			esac ;;
 		esac ;;
-		"sv" ) case ${Minor} in
+		"sv" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1092,7 +1136,7 @@ function set_ResourceID {
 				"SE" ) ResourceID=7 ;;
 			esac ;;
 		esac ;;
-		"nb" ) case ${Minor} in
+		"nb" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1106,7 +1150,7 @@ function set_ResourceID {
 				"NO" ) ResourceID=12 ;;
 			esac ;;
 		esac ;;
-		"da" ) case ${Minor} in
+		"da" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1120,7 +1164,7 @@ function set_ResourceID {
 				"DK" ) ResourceID=9 ;;
 			esac ;;
 		esac ;;
-		"fi" ) case ${Minor} in
+		"fi" ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"DE" ) ResourceID=3 ;;
 				"ES" ) ResourceID=8 ;;
@@ -1134,37 +1178,37 @@ function set_ResourceID {
 				"FI" ) ResourceID=17 ;;
 			esac ;;
 		esac ;;
-		"ru" ) case ${Minor} in
+		"ru" ) case ${TargetOSMinor} in
 			5 ) ResourceID=19456 ;;
 			* ) case "${2}" in
 				"RU" ) ResourceID=19456 ;;
 			esac ;;
 		esac ;;
-		"pl" ) case ${Minor} in
+		"pl" ) case ${TargetOSMinor} in
 			5 ) ResourceID=30776 ;;
 			* ) case "${2}" in
 				"PL" ) ResourceID=30776 ;;
 			esac ;;
 		esac ;;
-		"zh-Hans" ) case ${Minor} in
+		"zh-Hans" ) case ${TargetOSMinor} in
 			5 ) ResourceID=28672 ;;
 			* ) case "${2}" in
 				"CN" ) ResourceID=28672 ;;
 			esac ;;
 		esac ;;
-		"zh-Hant" ) case ${Minor} in
+		"zh-Hant" ) case ${TargetOSMinor} in
 			5 ) ResourceID=16896 ;;
 			* ) case "${2}" in
 				"TW" ) ResourceID=16896 ;;
 			esac ;;
 		esac ;;
-		"ko" ) case ${Minor} in
+		"ko" ) case ${TargetOSMinor} in
 			5 ) ResourceID=17408 ;;
 			* ) case "${2}" in
 				"KR" ) ResourceID=17408 ;;
 			esac ;;
 		esac ;;
-		* ) case ${Minor} in
+		* ) case ${TargetOSMinor} in
 			5 ) case "${2}" in
 				"AU" ) ResourceID=15 ;;
 				"DE" ) ResourceID=3 ;;
@@ -1222,44 +1266,44 @@ function set_SAKeyboard_SATypingStyle {
 		"Cherokee-Nation" ) SAKeyboard="Cherokee - Nation" ;;
 		"Cherokee-QWERTY" ) SAKeyboard="Cherokee - QWERTY" ;;
 		"SCIM.ITABC" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="ITABC" ;;
 				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Pinyin - Simplified" ;;
 			esac ;;
 		"SCIM.WBH" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="Wubi Hua" ;;
 				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Wubi Hua" ;;
 			esac ;;
 		"SCIM.WBX" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Simplified Chinese" ; SATypingStyle="Wubi Xing" ;;
 				* ) SAKeyboard="Chinese - Simplified" ; SATypingStyle="Wubi Xing" ;;
 			esac ;;
 		"TCIM.Cangjie" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Cangjie" ;;
 				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Cangjie" ;;
 			esac ;;
 		"TCIM.Dayi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Dayi(Pro)" ;;
 				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Dayi Pro" ;;
 			esac ;;
 		"TCIM.Hanin" ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Hanin" ;;
 		"TCIM.Jianyi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Jianyi" ;;
 				6 | 7 ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Jianyi" ;;
 				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Sucheng" ;;
 			esac ;;
 		"TCIM.Pinyin" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Pinyin" ;;
 				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Pinyin - Traditional" ;;
 			esac ;;
 		"TCIM.Zhuyin" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SAKeyboard="Traditional Chinese" ; SATypingStyle="Zhuyin" ;;
 				* ) SAKeyboard="Chinese - Traditional" ; SATypingStyle="Zhuyin" ;;
 			esac ;;
@@ -1310,12 +1354,12 @@ function set_SAKeyboard_SATypingStyle {
 		"Irish" ) SAKeyboard="Irish" ;;
 		"IrishExtended" ) SAKeyboard="Irish Extended" ;;
 		"Italian" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) SAKeyboard="Italian" ;;
 				7 | 8 ) SAKeyboard="Italian Typewriter" ;;
 			esac ;;
 		"Italian-Pro" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) SAKeyboard="Italian - Pro" ;;
 				7 | 8 ) SAKeyboard="Italian" ;;
 			esac ;;
@@ -1344,7 +1388,7 @@ function set_SAKeyboard_SATypingStyle {
 		"Oriya-QWERTY" ) SAKeyboard="Oriya - QWERTY" ;;
 		"Persian" ) SAKeyboard="Persian" ;;
 		"Persian-ISIRI2901" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				8 ) SAKeyboard="Persian - ISIRI" ;;
 				* ) SAKeyboard="Persian - ISIRI 2901" ;;
 			esac ;;
@@ -1402,7 +1446,7 @@ function set_SAKeyboard_SATypingStyle {
 }
 
 function set_InputSourceIDs {
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		5 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Croatian" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "DVORAK-QWERTYCMD" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kazakh" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Dayi" "TCIM.Hanin" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "US" "USExtended" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
 		6 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Croatian" "Croatian-PC" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "Dvorak-Left" "DVORAK-QWERTYCMD" "Dvorak-Right" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kazakh" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Dayi" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "US" "USExtended" "USInternational-PC" "Uyghur-QWERTY" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
 		7 ) InputSourceIDs=( "AfghanDari" "AfghanPashto" "AfghanUzbek" "Arabic" "Arabic-QWERTY" "ArabicPC" "Armenian-HMQWERTY" "Armenian-WesternQWERTY" "Australian" "Austrian" "Azeri" "Bangla" "Bangla-QWERTY" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian-Phonetic" "Byelorussian" "Canadian" "Canadian-CSA" "Cherokee-Nation" "Cherokee-QWERTY" "Colemak" "Croatian" "Croatian-PC" "Czech" "Czech-QWERTY" "Danish" "Devanagari" "Devanagari-QWERTY" "Dutch" "Dvorak" "Dvorak-Left" "DVORAK-QWERTYCMD" "Dvorak-Right" "Estonian" "Faroese" "Finnish" "FinnishExtended" "FinnishSami-PC" "French" "French-numerical" "German" "Greek" "GreekPolytonic" "Gujarati" "Gujarati-QWERTY" "Gurmukhi" "Gurmukhi-QWERTY" "Hawaiian" "Hebrew" "Hebrew-PC" "Hebrew-QWERTY" "Hungarian" "Icelandic" "Inuktitut-Nunavut" "Inuktitut-Nutaaq" "Inuktitut-QWERTY" "InuttitutNunavik" "Irish" "IrishExtended" "Italian" "Italian-Pro" "Japanese.Katakana" "Japanese.Roman" "Jawi-QWERTY" "Kannada" "Kannada-QWERTY" "Kazakh" "Khmer" "Korean.2SetKorean" "Korean.390Sebulshik" "Korean.3SetKorean" "Korean.GongjinCheongRomaja" "Korean.HNCRomaja" "Kurdish-Sorani" "Latvian" "Lithuanian" "Macedonian" "Malayalam" "Malayalam-QWERTY" "Maltese" "Maori" "Myanmar-QWERTY" "Nepali" "NorthernSami" "Norwegian" "NorwegianExtended" "NorwegianSami-PC" "Oriya" "Oriya-QWERTY" "Persian" "Persian-ISIRI2901" "Persian-QWERTY" "Polish" "PolishPro" "Portuguese" "Romanian" "Romanian-Standard" "Russian" "Russian-Phonetic" "RussianWin" "Sami-PC" "SCIM.ITABC" "SCIM.WBH" "SCIM.WBX" "Serbian" "Serbian-Latin" "Sinhala" "Sinhala-QWERTY" "Slovak" "Slovak-QWERTY" "Slovenian" "Spanish" "Spanish-ISO" "Swedish" "Swedish-Pro" "SwedishSami-PC" "SwissFrench" "SwissGerman" "Tamil.AnjalIM" "Tamil.Tamil99" "TCIM.Cangjie" "TCIM.Jianyi" "TCIM.Pinyin" "TCIM.Zhuyin" "Telugu" "Telugu-QWERTY" "Thai" "Thai-PattaChote" "Tibetan-QWERTY" "Tibetan-Wylie" "TibetanOtaniUS" "Turkish" "Turkish-QWERTY" "Turkish-QWERTY-PC" "Ukrainian" "UnicodeHexInput" "Urdu" "US" "USExtended" "USInternational-PC" "Uyghur-QWERTY" "Vietnamese" "VietnameseSimpleTelex" "VietnameseTelex" "VietnameseVIQR" "VietnameseVNI" "Welsh" ) ;;
@@ -1423,7 +1467,7 @@ function get_Keyboard {
 }
 
 function set_AllKeyboards {
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		5 ) AllKeyboards=( "Afghan Dari" "Afghan Pashto" "Afghan Uzbek" "Arabic" "Arabic - PC" "Arabic - QWERTY" "Armenian - HM QWERTY" "Armenian - Western QWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian - Phonetic" "Byelorussian" "Canadian English" "Canadian French - CSA" "Cherokee - Nation" "Cherokee - QWERTY" "Croatian" "Czech" "Czech - QWERTY" "Danish" "Devanagari" "Devanagari - QWERTY" "Dutch" "Dvorak" "Dvorak - Qwerty ⌘" "Estonian" "Faroese" "Finnish" "Finnish Extended" "Finnish Sami - PC" "French" "French - Numerical" "German" "Greek" "Greek Polytonic" "Gujarati" "Gujarati - QWERTY" "Gurmukhi" "Gurmukhi - QWERTY" "Hangul" "Hawaiian" "Hebrew" "Hebrew - QWERTY" "Hungarian" "Icelandic" "Inuktitut - Nunavut" "Inuktitut - Nutaaq" "Inuktitut - QWERTY" "Inuttitut Nunavik" "Irish" "Irish Extended" "Italian" "Italian - Pro" "Jawi - QWERTY" "Kazakh" "Kotoeri" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "Northern Sami" "Norwegian" "Norwegian Extended" "Norwegian Sami - PC" "Persian" "Persian - ISIRI 2901" "Persian - QWERTY" "Polish" "Polish Pro" "Portuguese" "Romanian" "Romanian - Standard" "Russian" "Russian - PC" "Russian - Phonetic" "Sami - PC" "Serbian" "Serbian - Latin" "Simplified Chinese" "Slovak" "Slovak - QWERTY" "Slovenian" "Spanish" "Spanish - ISO" "Swedish" "Swedish - Pro" "Swedish Sami - PC" "Swiss French" "Swiss German" "Tamil Input Method" "Thai" "Thai - PattaChote" "Tibetan - Otani" "Tibetan - QWERTY" "Tibetan - Wylie" "Traditional Chinese" "Turkish" "Turkish - QWERTY" "Turkish - QWERTY PC" "U.S." "U.S. Extended" "Ukrainian" "Unicode Hex Input" "Vietnamese" "Vietnamese UniKey" "Welsh" ) ;;
 		6 ) AllKeyboards=( "Afghan Dari" "Afghan Pashto" "Afghan Uzbek" "Arabic" "Arabic - PC" "Arabic - QWERTY" "Armenian - HM QWERTY" "Armenian - Western QWERTY" "Australian" "Austrian" "Azeri" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian - Phonetic" "Byelorussian" "Canadian English" "Canadian French - CSA" "Cherokee - Nation" "Cherokee - QWERTY" "Chinese - Simplified" "Chinese - Traditional" "Croatian" "Croatian - PC" "Czech" "Czech - QWERTY" "Danish" "Devanagari" "Devanagari - QWERTY" "Dutch" "Dvorak" "Dvorak - Left" "Dvorak - Qwerty ⌘" "Dvorak - Right" "Estonian" "Faroese" "Finnish" "Finnish Extended" "Finnish Sami - PC" "French" "French - Numerical" "German" "Greek" "Greek Polytonic" "Gujarati" "Gujarati - QWERTY" "Gurmukhi" "Gurmukhi - QWERTY" "Hangul" "Hawaiian" "Hebrew" "Hebrew - QWERTY" "Hungarian" "Icelandic" "Inuktitut - Nunavut" "Inuktitut - Nutaaq" "Inuktitut - QWERTY" "Inuttitut Nunavik" "Irish" "Irish Extended" "Italian" "Italian - Pro" "Jawi - QWERTY" "Kazakh" "Kotoeri" "Latvian" "Lithuanian" "Macedonian" "Maltese" "Maori" "Nepali" "Northern Sami" "Norwegian" "Norwegian Extended" "Norwegian Sami - PC" "Persian" "Persian - ISIRI 2901" "Persian - QWERTY" "Polish" "Polish Pro" "Portuguese" "Romanian" "Romanian - Standard" "Russian" "Russian - PC" "Russian - Phonetic" "Sami - PC" "Serbian" "Serbian - Latin" "Slovak" "Slovak - QWERTY" "Slovenian" "Spanish" "Spanish - ISO" "Swedish" "Swedish - Pro" "Swedish Sami - PC" "Swiss French" "Swiss German" "Tamil Input Method" "Thai" "Thai - PattaChote" "Tibetan - Otani" "Tibetan - QWERTY" "Tibetan - Wylie" "Turkish" "Turkish - QWERTY" "Turkish - QWERTY PC" "U.S." "U.S. Extended" "U.S. International - PC" "Ukrainian" "Unicode Hex Input" "Uyghur - QWERTY" "Vietnamese" "Vietnamese UniKey" "Welsh" ) ;;
 		7 ) AllKeyboards=( "Afghan Dari" "Afghan Pashto" "Afghan Uzbek" "Arabic" "Arabic - PC" "Arabic - QWERTY" "Armenian - HM QWERTY" "Armenian - Western QWERTY" "Australian" "Austrian" "Azeri" "Bangla" "Bangla - Qwerty" "Belgian" "Brazilian" "British" "Bulgarian" "Bulgarian - Phonetic" "Byelorussian" "Canadian English" "Canadian French - CSA" "Cherokee - Nation" "Cherokee - QWERTY" "Chinese - Simplified" "Chinese - Traditional" "Colemak" "Croatian" "Croatian - PC" "Czech" "Czech - QWERTY" "Danish" "Devanagari" "Devanagari - QWERTY" "Dutch" "Dvorak" "Dvorak - Left" "Dvorak - Qwerty ⌘" "Dvorak - Right" "Estonian" "Faroese" "Finnish" "Finnish Extended" "Finnish Sami - PC" "French" "French - Numerical" "German" "Greek" "Greek Polytonic" "Gujarati" "Gujarati - QWERTY" "Gurmukhi" "Gurmukhi - QWERTY" "Hangul" "Hawaiian" "Hebrew" "Hebrew - PC" "Hebrew - QWERTY" "Hungarian" "Icelandic" "Inuktitut - Nunavut" "Inuktitut - Nutaaq" "Inuktitut - QWERTY" "Inuttitut Nunavik" "Irish" "Irish Extended" "Italian" "Italian Typewriter" "Jawi - QWERTY" "Kannada" "Kannada - QWERTY" "Kazakh" "Khmer" "Kotoeri" "Kurdish-Sorani" "Latvian" "Lithuanian" "Macedonian" "Malayalam" "Malayalam - QWERTY" "Maltese" "Maori" "Myanmar - QWERTY" "Nepali" "Northern Sami" "Norwegian" "Norwegian Extended" "Norwegian Sami - PC" "Oriya" "Oriya - QWERTY" "Persian" "Persian - ISIRI 2901" "Persian - QWERTY" "Polish" "Polish Pro" "Portuguese" "Romanian" "Romanian - Standard" "Russian" "Russian - PC" "Russian - Phonetic" "Sami - PC" "Serbian" "Serbian - Latin" "Sinhala" "Sinhala - QWERTY" "Slovak" "Slovak - QWERTY" "Slovenian" "Spanish" "Spanish - ISO" "Swedish" "Swedish - Pro" "Swedish Sami - PC" "Swiss French" "Swiss German" "Tamil Input Method" "Telugu" "Telugu - QWERTY" "Thai" "Thai - PattaChote" "Tibetan - Otani" "Tibetan - QWERTY" "Tibetan - Wylie" "Turkish" "Turkish - QWERTY" "Turkish - QWERTY PC" "U.S." "U.S. Extended" "U.S. International - PC" "Ukrainian" "Unicode Hex Input" "Urdu" "Uyghur - QWERTY" "Vietnamese" "Vietnamese UniKey" "Welsh" ) ;;
@@ -1436,7 +1480,7 @@ function set_TypingStyles {
 	case "${1}" in
 		"Chinese - Simplified" ) TypingStyles=( "Pinyin - Simplified" "Wubi Hua" "Wubi Xing" ) ;;
 		"Chinese - Traditional" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) TypingStyles=( "Zhuyin" "Cangjie" "Dayi Pro" "Jianyi" "Pinyin - Traditional" ) ;;
 				7 ) TypingStyles=( "Zhuyin" "Cangjie" "Jianyi" "Pinyin - Traditional" ) ;;
 				* ) TypingStyles=( "Zhuyin" "Cangjie" "Zhuyin - Eten" "Sucheng" "Pinyin - Traditional" ) ;;
@@ -1457,7 +1501,7 @@ function set_CurrentKeyboards {
 	unset DefaultKeyboard
 	unset LanguageKeyboards[@]
 	unset CountryKeyboards[@]
-	if [ ${Minor} -lt 8 ] ; then DefaultKeyboard="U.S." ; fi
+	if [ ${TargetOSMinor} -lt 8 ] ; then DefaultKeyboard="U.S." ; fi
 	case "${1}" in
 		"en" ) LanguageKeyboards=( "U.S." ) ;;
 		"ja" ) LanguageKeyboards=( "Kotoeri" ) ;;
@@ -1465,13 +1509,13 @@ function set_CurrentKeyboards {
 		"de" ) LanguageKeyboards=( "German" ) ;;
 		"es" ) LanguageKeyboards=( "Spanish - ISO" "Spanish" ) ;;
 		"it" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) LanguageKeyboards=( "Italian - Pro" ) ;;
 				* ) LanguageKeyboards=( "Italian" ) ;;
 			esac ;;
 		"pt" ) LanguageKeyboards=( "Portuguese" "Brazilian" ) ;;
 		"pt-PT" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 | 7 | 8 ) LanguageKeyboards=( "Portuguese" "Brazilian" ) ;;
 			esac ;;
 		"nl" ) LanguageKeyboards=( "Dutch" "Belgian" ) ;;
@@ -1482,22 +1526,22 @@ function set_CurrentKeyboards {
 		"ru" ) LanguageKeyboards=( "Russian" "Russian - Phonetic" ) ;;
 		"pl" ) LanguageKeyboards=( "Polish Pro" "Polish" ) ;;
 		"zh-Hans" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) LanguageKeyboards=( "Simplified Chinese" ) ;;
 				* ) LanguageKeyboards=( "Chinese - Simplified" ) ;;
 			esac ;;
 		"zh-Hant" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) LanguageKeyboards=( "Traditional Chinese" ) ;;
 				* ) LanguageKeyboards=( "Chinese - Traditional" ) ;;
 			esac ;;
 		"ko" ) LanguageKeyboards=( "Hangul" ) ;;
 		"ar" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				8 ) LanguageKeyboards=( "Arabic" "Arabic - PC" "Arabic - QWERTY" ) ;;
 			esac ;;
 		"el" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				8 ) LanguageKeyboards=( "U.S." "Greek" "Greek Polytonic" ) ;;
 			esac ;;
 	esac
@@ -1511,19 +1555,19 @@ function set_CurrentKeyboards {
 		"BE" ) CountryKeyboards=( "Belgian" "French" ) ;;
 		"BG" ) CountryKeyboards=( "Bulgarian" "Bulgarian - Phonetic" ) ;;
 		"BR" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) CountryKeyboards=( "Brazilian" ) ;;
 				* ) CountryKeyboards=( "Brazilian" "U.S. International - PC" ) ;;
 			esac ;;
 		"BY" ) CountryKeyboards=( "Byelorussian" ) ;;
 		"CA" ) CountryKeyboards=( "Canadian English" "Canadian French - CSA" ) ;;
 		"CN" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) CountryKeyboards=( "Simplified Chinese" ) ;;
 				* ) CountryKeyboards=( "Chinese - Simplified" ) ;;
 			esac ;;
 		"CY" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				8 ) CountryKeyboards=( "U.S." "Greek" "Greek Polytonic" ) ;;
 			esac ;;
 		"CZ" ) CountryKeyboards=( "Czech - QWERTY" "Czech" ) ;;
@@ -1544,7 +1588,7 @@ function set_CurrentKeyboards {
 		"IN" ) CountryKeyboards=( "Devanagari" "Devanagari - QWERTY" "Gurmukhi" "Gurmukhi -QWERTY" "Gujarati" "Gujarati - QWERTY" ) ;;
 		"IS" ) CountryKeyboards=( "Icelandic" ) ;;
 		"IT" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) CountryKeyboards=( "Italian - Pro" ) ;;
 				* ) CountryKeyboards=( "Italian" ) ;;
 			esac ;;
@@ -1568,7 +1612,7 @@ function set_CurrentKeyboards {
 		"SA" ) CountryKeyboards=( "Arabic" "Arabic - PC" "Arabic - QWERTY" ) ;;
 		"SE" ) CountryKeyboards=( "Swedish - Pro" ) ;;
 		"SG" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) CountryKeyboards=( "Simplified Chinese" ) ;;
 				* ) CountryKeyboards=( "Chinese - Simplified" ) ;;
 			esac ;;
@@ -1577,12 +1621,12 @@ function set_CurrentKeyboards {
 		"TH" ) CountryKeyboards=( "Thai" "Thai - PattaChote" ) ;;
 		"TR" ) CountryKeyboards=( "Turkish" "Turkish - QWERTY" "Turkish - QWERTY PC" ) ;;
 		"TW" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) CountryKeyboards=( "Traditional Chinese" ) ;;
 				* ) CountryKeyboards=( "Chinese - Traditional" ) ;;
 			esac ;;
 		"UA" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) CountryKeyboards=( "Ukrainian" ) ;;
 				* ) CountryKeyboards=( "Ukrainian" "Russian" "Russian - Phonetic" ) ;;
 			esac ;;
@@ -1610,7 +1654,7 @@ function set_CurrentKeyboards {
 		"ru-LV" ) unset LanguageKeyboards[@] ;;
 		"ru-UA" ) unset LanguageKeyboards[@] ;;
 	esac
-	case ${Minor} in
+	case ${TargetOSMinor} in
 		5 )
 			case "${1}-${2}" in
 				"fr-LU" ) unset LanguageKeyboards[@] ;;
@@ -1625,7 +1669,7 @@ function set_CurrentKeyboards {
 				"ru-LT" ) unset LanguageKeyboards[@] ;;
 			esac ;;
 	esac
-	if [ ${Minor} -gt 5 ] ; then
+	if [ ${TargetOSMinor} -gt 5 ] ; then
 		if [ "${1}" == "pt-PT" ] ; then unset CountryKeyboards[@] ; fi
 		if [ "${1}" == "zh-Hans" ] || [ "${1}" == "zh-Hant" ] ; then
 			if [ ${#CountryKeyboards[@]} -gt 0 ] ; then unset LanguageKeyboards[@] ; fi
@@ -1676,31 +1720,31 @@ function set_Bundle_IDs {
 		"GongjinCheong Romaja" ) Bundle_IDs[1]="com.apple.inputmethod.Korean" ; Bundle_IDs[2]="com.apple.inputmethod.Korean" ; Bundle_IDs[3]="com.apple.inputmethod.Korean" ; Bundle_IDs[4]="com.apple.inputmethod.Korean" ; Bundle_IDs[5]="com.apple.inputmethod.Korean" ; Bundle_IDs[6]="com.apple.inputmethod.Korean" ;;
 		"HNC Romaja" ) Bundle_IDs[1]="com.apple.inputmethod.Korean" ; Bundle_IDs[2]="com.apple.inputmethod.Korean" ; Bundle_IDs[3]="com.apple.inputmethod.Korean" ; Bundle_IDs[4]="com.apple.inputmethod.Korean" ; Bundle_IDs[5]="com.apple.inputmethod.Korean" ; Bundle_IDs[6]="com.apple.inputmethod.Korean" ;;
 		"Kana" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[0]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[1]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[2]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[3]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[4]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[5]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[6]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[7]="com.apple.CharacterPaletteIM" ; Bundle_IDs[8]="com.apple.50onPaletteIM" ;;
 				* ) Bundle_IDs[0]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[1]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[2]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[3]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[4]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[5]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[6]="com.apple.inputmethod.Kotoeri" ;;
 			esac ;;
 		"Romaji" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[0]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[1]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[2]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[3]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[4]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[5]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[6]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[7]="com.apple.CharacterPaletteIM" ; Bundle_IDs[8]="com.apple.50onPaletteIM" ;;
 				* ) Bundle_IDs[0]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[1]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[2]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[3]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[4]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[5]="com.apple.inputmethod.Kotoeri" ; Bundle_IDs[6]="com.apple.inputmethod.Kotoeri" ;;
 			esac ;;
 		"ITABC" ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ;;
 		"Pinyin - Simplified" ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ; Bundle_IDs[5]="com.apple.inputmethod.ChineseHandwriting" ;;
 		"Wubi Hua" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ;;
 				* ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ; Bundle_IDs[5]="com.apple.inputmethod.ChineseHandwriting" ;;
 			esac ;;
 		"Wubi Xing" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ;;
 				* ) Bundle_IDs[1]="com.apple.inputmethod.SCIM" ; Bundle_IDs[2]="com.apple.inputmethod.SCIM" ; Bundle_IDs[3]="com.apple.inputmethod.SCIM" ; Bundle_IDs[4]="com.apple.inputmethod.SCIM" ; Bundle_IDs[5]="com.apple.inputmethod.ChineseHandwriting" ;;
 			esac ;;
 		"Anjal" ) Bundle_IDs[1]="com.apple.inputmethod.Tamil" ; Bundle_IDs[2]="com.apple.inputmethod.Tamil" ; Bundle_IDs[3]="com.apple.inputmethod.Tamil" ;;
 		"Tamil99" ) Bundle_IDs[1]="com.apple.inputmethod.Tamil" ; Bundle_IDs[2]="com.apple.inputmethod.Tamil" ; Bundle_IDs[3]="com.apple.inputmethod.Tamil" ;;
 		"Cangjie" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ;;
 				6 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 				7 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.ChineseHandwriting" ;;
@@ -1710,21 +1754,21 @@ function set_Bundle_IDs {
 		"Dayi(Pro)" ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ;;
 		"Hanin" ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.TCIM" ;;
 		"Jianyi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ;;
 				6 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 				7 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.ChineseHandwriting" ;;
 			esac ;;
 		"Pinyin" ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ;;
 		"Pinyin - Traditional" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 				7 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.ChineseHandwriting" ;;
 				8 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 			esac ;;
 		"Sucheng" ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 		"Zhuyin" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ;;
 				6 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.TCIM" ; Bundle_IDs[7]="com.apple.inputmethod.ChineseHandwriting" ;;
 				7 ) Bundle_IDs[1]="com.apple.inputmethod.TCIM" ; Bundle_IDs[2]="com.apple.inputmethod.TCIM" ; Bundle_IDs[3]="com.apple.inputmethod.TCIM" ; Bundle_IDs[4]="com.apple.inputmethod.TCIM" ; Bundle_IDs[5]="com.apple.inputmethod.TCIM" ; Bundle_IDs[6]="com.apple.inputmethod.ChineseHandwriting" ;;
@@ -1752,27 +1796,27 @@ function set_Input_Modes {
 		"ITABC" ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBX" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBH" ;;
 		"Pinyin - Simplified" ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBH" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBX" ;;
 		"Wubi Hua" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBX" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBH" ;;
 				* ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBH" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBX" ;;
 			esac ;;
 		"Wubi Xing" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBX" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBH" ;;
 				* ) Input_Modes[1]="com.apple.inputmethod.SCIM.ITABC" ; Input_Modes[2]="com.apple.inputmethod.SCIM.WBH" ; Input_Modes[3]="com.apple.inputmethod.SCIM.WBX" ;;
 			esac ;;
 		"Anjal" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.Tamil.Tamil99" ; Input_Modes[2]="com.apple.inputmethod.Tamil.AnjalIM" ;;
 				* ) Input_Modes[1]="com.apple.inputmethod.Tamil.AnjalIM" ; Input_Modes[2]="com.apple.inputmethod.Tamil.Tamil99" ;;
 			esac ;;
 		"Tamil99" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.Tamil.Tamil99" ; Input_Modes[2]="com.apple.inputmethod.Tamil.AnjalIM" ;;
 				* ) Input_Modes[1]="com.apple.inputmethod.Tamil.AnjalIM" ; Input_Modes[2]="com.apple.inputmethod.Tamil.Tamil99" ;;
 			esac ;;
 		"Cangjie" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ;;
 				6 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 				7 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ;;
@@ -1782,21 +1826,21 @@ function set_Input_Modes {
 		"Dayi(Pro)" ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ;;
 		"Hanin" ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[7]="com.apple.inputmethod.TCIM.Hanin" ;;
 		"Jianyi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ;;
 				6 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 				7 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ;;
 			esac ;;
 		"Pinyin" ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ;;
 		"Pinyin - Traditional" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 				7 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ;;
 				8 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.ZhuyinEten" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 			esac ;;
 		"Sucheng" ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.ZhuyinEten" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 		"Zhuyin" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Cangjie" ;;
 				6 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Dayi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[5]="com.apple.inputmethod.TCIM.Pinyin" ;;
 				7 ) Input_Modes[1]="com.apple.inputmethod.TCIM.Zhuyin" ; Input_Modes[2]="com.apple.inputmethod.TCIM.Cangjie" ; Input_Modes[3]="com.apple.inputmethod.TCIM.Jianyi" ; Input_Modes[4]="com.apple.inputmethod.TCIM.Pinyin" ;;
@@ -1853,12 +1897,12 @@ function set_InputSourceKinds {
 		"Kazakh" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Keyboard Layout" ;;
 		"Khmer" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Keyboard Layout" ;;
 		"Kana" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Input Mode" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ; InputSourceKinds[8]="Non Keyboard Input Method" ;;
 				* ) InputSourceKinds[0]="Input Mode" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 			esac ;;
 		"Romaji" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Input Mode" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ; InputSourceKinds[8]="Non Keyboard Input Method" ;;
 				* ) InputSourceKinds[0]="Input Mode" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 			esac ;;
@@ -1881,12 +1925,12 @@ function set_InputSourceKinds {
 		"ITABC" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ;;
 		"Pinyin - Simplified" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ; InputSourceKinds[5]="Non Keyboard Input Method" ;;
 		"Wubi Hua" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ;;
 				* ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ; InputSourceKinds[5]="Non Keyboard Input Method" ;;
 			esac ;;
 		"Wubi Xing" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ;;
 				* ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Keyboard Input Method" ; InputSourceKinds[5]="Non Keyboard Input Method" ;;
 			esac ;;
@@ -1902,7 +1946,7 @@ function set_InputSourceKinds {
 		"Tibetan - QWERTY" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Keyboard Layout" ;;
 		"Tibetan - Wylie" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Keyboard Layout" ;;
 		"Cangjie" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 				6 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 				7 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Keyboard Input Method" ; InputSourceKinds[6]="Non Keyboard Input Method" ;;
@@ -1912,21 +1956,21 @@ function set_InputSourceKinds {
 		"Dayi(Pro)" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 		"Hanin" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Input Mode" ;;
 		"Jianyi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 				6 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 				7 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Keyboard Input Method" ; InputSourceKinds[6]="Non Keyboard Input Method" ;;
 			esac ;;
 		"Pinyin" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 		"Pinyin - Traditional" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 				7 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Keyboard Input Method" ; InputSourceKinds[6]="Non Keyboard Input Method" ;;
 				8 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 			esac ;;
 		"Sucheng" ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 		"Zhuyin" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ;;
 				6 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Input Mode" ; InputSourceKinds[6]="Keyboard Input Method" ; InputSourceKinds[7]="Non Keyboard Input Method" ;;
 				7 ) InputSourceKinds[0]="Keyboard Layout" ; InputSourceKinds[1]="Input Mode" ; InputSourceKinds[2]="Input Mode" ; InputSourceKinds[3]="Input Mode" ; InputSourceKinds[4]="Input Mode" ; InputSourceKinds[5]="Keyboard Input Method" ; InputSourceKinds[6]="Non Keyboard Input Method" ;;
@@ -2016,7 +2060,7 @@ function set_KeyboardLayout_IDs {
 		"Irish" ) KeyboardLayout_IDs[0]=50 ;;
 		"Irish Extended" ) KeyboardLayout_IDs[0]=-500 ;;
 		"Italian" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) KeyboardLayout_IDs[0]=4 ;;
 				7 | 8 ) KeyboardLayout_IDs[0]=223 ;;
 			esac ;;
@@ -2164,7 +2208,7 @@ function set_KeyboardLayout_Names {
 		"Irish" ) KeyboardLayout_Names[0]="Irish" ;;
 		"Irish Extended" ) KeyboardLayout_Names[0]="Irish Extended" ;;
 		"Italian" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) KeyboardLayout_Names[0]="Italian" ;;
 				7 | 8 ) KeyboardLayout_Names[0]="Italian - Pro" ;;
 			esac ;;
@@ -2305,24 +2349,24 @@ function set_SelectedInputSource {
 		"ITABC" ) SelectedInputSource=1 ;;
 		"Pinyin - Simplified" ) SelectedInputSource=1 ;;
 		"Wubi Hua" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SelectedInputSource=3 ;;
 				* ) SelectedInputSource=2 ;;
 			esac ;;
 		"Wubi Xing" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SelectedInputSource=2 ;;
 				* ) SelectedInputSource=3 ;;
 			esac ;;
 		"Sinhala" ) SelectedInputSource=1 ;;
 		"Sinhala - QWERTY" ) SelectedInputSource=1 ;;
 		"Anjal" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SelectedInputSource=2 ;;
 				* ) SelectedInputSource=1 ;;
 			esac ;;
 		"Tamil99" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SelectedInputSource=1 ;;
 				* ) SelectedInputSource=2 ;;
 			esac ;;
@@ -2334,7 +2378,7 @@ function set_SelectedInputSource {
 		"Tibetan - QWERTY" ) SelectedInputSource=1 ;;
 		"Tibetan - Wylie" ) SelectedInputSource=1 ;;
 		"Cangjie" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) SelectedInputSource=5 ;;
 				* ) SelectedInputSource=2 ;;
 			esac ;;
@@ -2342,13 +2386,13 @@ function set_SelectedInputSource {
 		"Dayi(Pro)" ) SelectedInputSource=2 ;;
 		"Hanin" ) SelectedInputSource=7 ;;
 		"Jianyi" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 | 8 ) SelectedInputSource=4 ;;
 				* ) SelectedInputSource=3 ;;
 			esac ;;
 		"Pinyin" ) SelectedInputSource=4 ;;
 		"Pinyin - Traditional" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 | 8 ) SelectedInputSource=5 ;;
 				7 ) SelectedInputSource=4 ;;
 			esac ;;
@@ -2370,7 +2414,7 @@ function set_SelectedInputSource {
 
 function set_CurrentKeyboardLayoutInputSourceID {
 	# ${1}: Keyboard or TypingStyle
-	if [ ${Minor} -eq 5 ] ; then
+	if [ ${TargetOSMinor} -eq 5 ] ; then
 		unset CurrentKeyboardLayoutInputSourceID
 	else
 		case "${1}" in
@@ -2439,7 +2483,7 @@ function set_CurrentKeyboardLayoutInputSourceID {
 			"Irish" ) CurrentKeyboardLayoutInputSourceID="com.apple.keylayout.Irish" ;;
 			"Irish Extended" ) CurrentKeyboardLayoutInputSourceID="com.apple.keylayout.IrishExtended" ;;
 			"Italian" )
-				case ${Minor} in
+				case ${TargetOSMinor} in
 					6 ) CurrentKeyboardLayoutInputSourceID="com.apple.keylayout.Italian" ;;
 					* ) CurrentKeyboardLayoutInputSourceID="com.apple.keylayout.Italian-Pro" ;;
 				esac ;;
@@ -2623,7 +2667,7 @@ function set_InputSourceID {
 		"Irish" ) InputSourceID="Irish" ;;
 		"Irish Extended" ) InputSourceID="IrishExtended" ;;
 		"Italian" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 | 6 ) InputSourceID="Italian" ;;
 				* ) InputSourceID="Italian-Pro" ;;
 			esac ;;
@@ -3305,7 +3349,7 @@ function set_TimeZone {
 		"Asia/Aden" | "Asia/Baghdad" | "Asia/Bahrain" | "Asia/Kuwait" | "Asia/Qatar" | "Asia/Riyadh" ) echo "Arabian Standard Time" ;;
 		"Asia/Almaty" | "Asia/Qyzylorda" ) echo "East Kazakhstan Standard Time" ;;
 		"Asia/Anadyr" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				7 ) echo "Magadan Time" ;;
 				* ) echo "Anadyr Time" ;;
 			esac ;;
@@ -3318,7 +3362,7 @@ function set_TimeZone {
 		"Asia/Calcutta" | "Asia/Colombo" | "Asia/Kolkata" ) echo "India Standard Time" ;;
 		"Asia/Chongqing" | "Asia/Harbin" | "Asia/Kashgar" | "Asia/Macau" | "Asia/Shanghai" | "Asia/Urumqi" ) echo "China Standard Time" ;;
 		"Asia/Dhaka" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) echo "GMT+07:00" ;;
 				* ) echo "Bangladesh Time" ;;
 			esac ;;
@@ -3332,7 +3376,7 @@ function set_TimeZone {
 		"Asia/Jerusalem" ) echo "Israel Standard Time" ;;
 		"Asia/Kabul" ) echo "Afghanistan Time" ;;
 		"Asia/Kamchatka" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				7 ) echo "Magadan Time" ;;
 				* ) echo "Petropavlovsk-Kamchatski Time" ;;
 			esac ;;
@@ -3345,7 +3389,7 @@ function set_TimeZone {
 		"Asia/Manila" ) echo "Philippine Time" ;;
 		"Asia/Novokuznetsk" ) echo "Novosibirsk Time" ;;
 		"Asia/Novosibirsk" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				5 ) echo "Novosibirsk Time" ;;
 				* ) echo "Krasnoyarsk Time" ;;
 			esac ;;
@@ -3356,7 +3400,7 @@ function set_TimeZone {
 		"Asia/Samarkand" | "Asia/Tashkent" ) echo "Uzbekistan Time" ;;
 		"Asia/Singapore" ) echo "Singapore Standard Time" ;;
 		"Asia/Taipei" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				7 ) echo "Taipei Standard Time" ;;
 				* ) echo "GMT+08:00" ;;
 			esac ;;
@@ -3377,18 +3421,18 @@ function set_TimeZone {
 		"Australia/Brisbane" | "Australia/Canberra" | "Australia/Hobart" | "Australia/Melbourne" | "Australia/Sydney" ) echo "Australian Eastern Standard Time" ;;
 		"Australia/Perth" ) echo "Australian Western Standard Time" ;;
 		"Europe/Kaliningrad" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) echo "Eastern European Time" ;;
 				* ) echo "GMT+03:00" ;;
 			esac ;;
 		"Europe/Minsk" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				6 ) echo "Eastern European Time" ;;
 				* ) echo "GMT+03:00" ;;
 			esac ;;
 		"Europe/Moscow" ) echo "Moscow Standard Time" ;;
 		"Europe/Samara" )
-			case ${Minor} in
+			case ${TargetOSMinor} in
 				7 ) echo "Moscow Standard Time" ;;
 				* ) echo "Samara Time" ;;
 			esac ;;
@@ -3578,7 +3622,7 @@ function set_TZFiles {
 		"East Africa Time" ) TZFiles=( "Africa/Addis_Ababa" "Africa/Asmara" "Africa/Asmera" "Africa/Dar_es_Salaam" "Africa/Djibouti" "Africa/Kampala" "Africa/Khartoum" "Africa/Mogadishu" "Africa/Nairobi" "Indian/Antananarivo" "Indian/Comoro" "Indian/Mayotte" ) ;;
 		"East Kazakhstan Standard Time" ) TZFiles=( "Asia/Almaty" "Asia/Qyzylorda" ) ;;
 		"East Timor Time" ) TZFiles=( "Asia/Dili" ) ;;
-		"Eastern European Time" ) TZFiles=( "Africa/Cairo" "Africa/Tripoli" "Asia/Amman" "Asia/Beirut" "Asia/Damascus" "Asia/Gaza" "Asia/Nicosia" "Europe/Athens" "Europe/Bucharest" "Europe/Chisinau" "Europe/Helsinki" "Europe/Istanbul" "Europe/Kiev" "Europe/Riga" "Europe/Simferopol" "Europe/Sofia" "Europe/Tallinn" "Europe/Uzhgorod" "Europe/Vilnius" "Europe/Zaporozhye" ) ; if [ ${Minor} -eq 6 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Kaliningrad" "Europe/Minsk" ) ; fi ;;
+		"Eastern European Time" ) TZFiles=( "Africa/Cairo" "Africa/Tripoli" "Asia/Amman" "Asia/Beirut" "Asia/Damascus" "Asia/Gaza" "Asia/Nicosia" "Europe/Athens" "Europe/Bucharest" "Europe/Chisinau" "Europe/Helsinki" "Europe/Istanbul" "Europe/Kiev" "Europe/Riga" "Europe/Simferopol" "Europe/Sofia" "Europe/Tallinn" "Europe/Uzhgorod" "Europe/Vilnius" "Europe/Zaporozhye" ) ; if [ ${TargetOSMinor} -eq 6 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Kaliningrad" "Europe/Minsk" ) ; fi ;;
 		"Eastern Indonesia Time" ) TZFiles=( "Asia/Jayapura" ) ;;
 		"Eastern Standard Time" ) TZFiles=( "America/Cayman" "America/Detroit" "America/Grand_Turk" "America/Indiana/Indianapolis" "America/Indiana/Vincennes" "America/Indianapolis" "America/Jamaica" "America/Kentucky/Louisville" "America/Kentucky/Monticello" "America/Montreal" "America/Nassau" "America/New_York" "America/Nipigon" "America/Panama" "America/Port-au-Prince" "America/Thunder_Bay" "America/Toronto" "Canada/Eastern" "US/Eastern" ) ;;
 		"Ecuador Time" ) TZFiles=( "America/Guayaquil" ) ;;
@@ -3606,14 +3650,14 @@ function set_TZFiles {
 		"Israel Standard Time" ) TZFiles=( "Asia/Jerusalem" ) ;;
 		"Japan Standard Time" ) TZFiles=( "Asia/Tokyo" ) ;;
 		"Korean Standard Time" ) TZFiles=( "Asia/Pyongyang" "Asia/Seoul" ) ;;
-		"Krasnoyarsk Time" ) TZFiles=( "Asia/Krasnoyarsk" ) ; if [ ${Minor} -ne 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
+		"Krasnoyarsk Time" ) TZFiles=( "Asia/Krasnoyarsk" ) ; if [ ${TargetOSMinor} -ne 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
 		"Kyrgyzstan Time" ) TZFiles=( "Asia/Bishkek" ) ;;
-		"Magadan Time" ) TZFiles=( "Asia/Magadan" ) ; if [ ${Minor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Anadyr" "Asia/Kamchatka" ) ; fi ;;
+		"Magadan Time" ) TZFiles=( "Asia/Magadan" ) ; if [ ${TargetOSMinor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Anadyr" "Asia/Kamchatka" ) ; fi ;;
 		"Malaysia Time" ) TZFiles=( "Asia/Kuala_Lumpur" "Asia/Kuching" ) ;;
 		"Maldives Time" ) TZFiles=( "Indian/Maldives" ) ;;
 		"Marshall Islands Time" ) TZFiles=( "Pacific/Majuro" ) ;;
 		"Mauritius Time" ) TZFiles=( "Indian/Mauritius" ) ;;
-		"Moscow Standard Time" ) TZFiles=( "Europe/Moscow" ) ; if [ ${Minor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Samara" ) ; fi ;;
+		"Moscow Standard Time" ) TZFiles=( "Europe/Moscow" ) ; if [ ${TargetOSMinor} -eq 7 ] ; then TZFiles=( "${TZFiles[@]}" "Europe/Samara" ) ; fi ;;
 		"Mountain Standard Time" ) TZFiles=( "America/Boise" "America/Chihuahua" "America/Dawson_Creek" "America/Denver" "America/Edmonton" "America/Hermosillo" "America/Mazatlan" "America/Ojinaga" "America/Phoenix" "America/Yellowknife" "Canada/Mountain" "US/Mountain" ) ;;
 		"Myanmar Time" ) TZFiles=( "Asia/Rangoon" ) ;;
 		"Nauru Time" ) TZFiles=( "Pacific/Nauru" ) ;;
@@ -3623,7 +3667,7 @@ function set_TZFiles {
 		"Newfoundland Standard Time" ) TZFiles=( "America/St_Johns" "Canada/Newfoundland" ) ;;
 		"Niue Time" ) TZFiles=( "Pacific/Niue" ) ;;
 		"Norfolk Islands Time" ) TZFiles=( "Pacific/Norfolk" ) ;;
-		"Novosibirsk Time" ) TZFiles=( "Asia/Novokuznetsk" ) ; if [ ${Minor} -eq 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
+		"Novosibirsk Time" ) TZFiles=( "Asia/Novokuznetsk" ) ; if [ ${TargetOSMinor} -eq 5 ] ; then TZFiles=( "${TZFiles[@]}" "Asia/Novosibirsk" ) ; fi ;;
 		"Omsk Time" ) TZFiles=( "Asia/Omsk" ) ;;
 		"Pacific Standard Time" ) TZFiles=( "America/Los_Angeles" "America/Santa_Isabel" "America/Tijuana" "America/Vancouver" "America/Whitehorse" "US/Pacific" ) ;;
 		"Pakistan Time" ) TZFiles=( "Asia/Karachi" ) ;;
@@ -3794,10 +3838,10 @@ function display_Target {
 	if [ -n "${Target}" ] ; then printf "${Target}" ; else printf "-" ; fi
 	printf "\n"
 	printf "System:			"
-	if [ -n "${Build}" ] ; then
-		printf "Mac OS X ${Major}.${Minor}"
-		if [ -n "${Point}" ] ; then printf ".${Point}" ; fi
-		printf " (${Build})"
+	if [ -n "${TargetOSBuild}" ] ; then
+		printf "Mac OS X ${TargetOSMajor}.${TargetOSMinor}"
+		if [ ${TargetOSPoint} -ne 0 ] ; then printf ".${TargetOSPoint}" ; fi
+		printf " (${TargetOSBuild})"
 	else
 		printf "-"
 	fi
@@ -3816,7 +3860,7 @@ function select_Target {
 		if [ "${Volume}" == "None" ] ; then unset Volume ; fi
 	fi
 	set_Target "${Volume}"
-	set_OSVersion
+	set_TargetOSVersion
 	refresh_Language
 	refresh_Country
 	refresh_Keyboard
@@ -3935,17 +3979,17 @@ function display_LocationServices {
 	printf "Location Services:	"
 	printf "["
 	if [ ${LocationServices} -eq 1 ] ; then
-		if [ ${Minor} -lt 8 ] ; then printf "-" ; else printf "*" ; fi
+		if [ ${TargetOSMinor} -lt 8 ] ; then printf "-" ; else printf "*" ; fi
 	else
 		printf " "
 	fi
 	printf "] Enable Location Services on this Mac\n\n"
 }
 
-function select_LocationServices {
+function set_LocationServices {
 	display_Subtitle "Location Services"
 	display_LocationServices
-	if [ ${Minor} -lt 8 ] ; then
+	if [ ${TargetOSMinor} -lt 8 ] ; then
 		echo "Note:	This setting only applies to Mac OS X 10.8 or greater"
 		echo
 	fi
@@ -3955,10 +3999,10 @@ function select_LocationServices {
 		case "${EnableLS}" in
 			"Y" | "y" ) echo ; LocationServices=1 ;;
 			"N" | "n" ) echo ; LocationServices=0 ;;
-			* ) echo ; EnableLS="" ;;
+			* ) echo ; unset EnableLS ;;
 		esac
 	done
-	EnableLS=""
+	unset EnableLS
 }
 
 function display_NTPSettings {
@@ -3998,10 +4042,10 @@ function select_NTPServer {
 		case "${NTPAuto}" in
 			"Y" | "y" ) echo ; NTPEnabled=1 ;;
 			"N" | "n" ) echo ; NTPEnabled=0 ;;
-			* ) echo ; NTPAuto="" ;;
+			* ) echo ; unset NTPAuto ;;
 		esac
 	done
-	NTPAuto=""
+	unset NTPAuto
 }
 
 function display_TimeZone {
@@ -4018,7 +4062,7 @@ function display_TimeZone {
 	printf "\n"
 	printf "			["
 	if [ ${TZAuto} -eq 1 ] ; then
-		if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then printf "-" ; else printf "*" ; fi
+		if [ ${TargetOSMinor} -lt 6 ] || [ ${TargetOSMinor} -gt 7 ] ; then printf "-" ; else printf "*" ; fi
 	else
 		printf " "
 	fi
@@ -4091,7 +4135,7 @@ function select_TimeZone {
 	while [ -z "${AutoTZ}" ] ; do
 		display_Subtitle "Select Time Zone"
 		display_TimeZone
-		if [ ${Minor} -lt 6 ] || [ ${Minor} -gt 7 ] ; then
+		if [ ${TargetOSMinor} -lt 6 ] || [ ${TargetOSMinor} -gt 7 ] ; then
 			echo "Note:	This setting only applies to Mac OS X 10.6 or 10.7"
 			echo
 		fi
@@ -4100,10 +4144,10 @@ function select_TimeZone {
 		case "${AutoTZ}" in
 			"Y" | "y" ) echo ; TZAuto=1 ;;
 			"N" | "n" ) echo ; TZAuto=0 ;;
-			* ) echo ; AutoTZ="" ;;
+			* ) echo ; unset AutoTZ ;;
 		esac
 	done
-	AutoTZ=""
+	unset AutoTZ
 }
 
 function display_RemoteLogin {
@@ -4121,10 +4165,10 @@ function select_RemoteLogin {
 		case "${EnableSSH}" in
 			"Y" | "y" ) echo ; RemoteLogin=1 ;;
 			"N" | "n" ) echo ; RemoteLogin=0 ;;
-			* ) echo ; EnableSSH="" ;;
+			* ) echo ; unset EnableSSH ;;
 		esac
 	done
-	EnableSSH=""
+	unset EnableSSH
 }
 
 function display_RemoteManagement {
@@ -4142,10 +4186,10 @@ function select_RemoteManagement {
 		case "${EnableARD}" in
 			"Y" | "y" ) echo ; RemoteManagement=1 ;;
 			"N" | "n" ) echo ; RemoteManagement=0 ;;
-			* ) echo ; EnableARD="" ;;
+			* ) echo ; unset EnableARD ;;
 		esac
 	done
-	EnableARD=""
+	unset EnableARD
 }
 
 function save_Settings {
@@ -4159,7 +4203,7 @@ function save_Settings {
 	save_RemoteManagement
 }
 
-function display_Configuration {
+function display_SystemSettings {
 	display_Target
 	display_Language
 	display_CountryName
@@ -4178,7 +4222,7 @@ function display_Output {
 	set_Localization "${Language}"
 	FirstBoot=0
 	if [ ${RemoteManagement} -eq 1 ] ; then FirstBoot=1 ; fi
-	if [ ${LocationServices} -eq 1 ] && [ ${Minor} -ge 8 ] ; then FirstBoot=1 ; fi
+	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then FirstBoot=1 ; fi
 	if [ ${FirstBoot} -eq 1 ] ; then
 		printf "\033[1m/Library/LaunchDaemons/FirstBoot.plist\033[m\n"
 		echo "Dict {"
@@ -4318,7 +4362,7 @@ function display_Output {
 		ZZH=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
 		Query="select ZNAME from ZGEOPLACENAME where ZZH_TW <> 0 and ZPLACE = ${Z_PK};"
 		ZZH_TW=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		case ${Minor} in
+		case ${TargetOSMinor} in
 			6 )
 				echo "            da = ${ZDA}" ;
 				echo "            nl = ${ZNL}" ;
@@ -4390,7 +4434,7 @@ function display_Output {
 		echo "        }"
 		echo "    }"
 	fi
-	if [ ${Minor} -gt 5 ] ; then
+	if [ ${TargetOSMinor} -gt 5 ] ; then
 		echo "    Country = ${SACountryCode}"
 		echo "    AppleLocale = ${LanguageCode}_${SACountryCode}"
 	fi
@@ -4400,7 +4444,7 @@ function display_Output {
 		echo "        ${Item}"
 	done
 	echo "    }"
-	if [ ${Minor} -eq 5 ] ; then echo "    Country = ${SACountryCode}" ; fi
+	if [ ${TargetOSMinor} -eq 5 ] ; then echo "    Country = ${SACountryCode}" ; fi
 	if [ ${UseGeoKit} -eq 1 ] ; then
 		echo "    com.apple.TimeZonePref.Last_Selected_City = Array {"
 		echo "        ${ZLATITUDE}"
@@ -4439,7 +4483,7 @@ function display_Output {
 		set_CurrentKeyboardLayoutInputSourceID "${SAKeyboard}"
 	fi
 	set_DefaultAsciiInputSource
-	if [ ${Minor} -gt 5 ] ; then echo "AppleCurrentKeyboardLayoutInputSourceID = ${CurrentKeyboardLayoutInputSourceID}" ; fi
+	if [ ${TargetOSMinor} -gt 5 ] ; then echo "AppleCurrentKeyboardLayoutInputSourceID = ${CurrentKeyboardLayoutInputSourceID}" ; fi
 	echo "    AppleDefaultAsciiInputSource = Dict {"
 	echo "        InputSourceKind = ${InputSourceKind}"
 	echo "        KeyboardLayout ID = ${KeyboardLayout_ID}"
@@ -4457,7 +4501,7 @@ function display_Output {
 		let i++
 	done
 	set_ScriptManager "${LanguageCode}"
-	if [ ${Minor} -eq 5 ] ; then set_ITLB "${LanguageCode}" ; else unset ITLB ; fi
+	if [ ${TargetOSMinor} -eq 5 ] ; then set_ITLB "${LanguageCode}" ; else unset ITLB ; fi
 	if [ -n "${ITLB}" ] ; then
 		echo "    AppleItlbDate = Dict {"
 		echo "        ${ScriptManager} = ${ITLB}"
@@ -4549,7 +4593,7 @@ function display_Output {
 		echo "exit 0"
 		echo
 	fi
-	if [ ${LocationServices} -eq 1 ] && [ ${Minor} -ge 8 ] ; then
+	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then
 		printf "\033[1m${FirstBootPath}/Actions/LocationServices.sh\033[m\n"
 		printf \#\!"/bin/sh\n"
 		echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then"
@@ -4574,36 +4618,786 @@ function display_Output {
 	press_anyKey
 }
 
-function menu_Configuration {
-	while [ "${Option}" != "Exit" ] ; do
-		display_Subtitle "Configuration"
-		display_Configuration
-		Options=( "Exit" "Save Settings" "Display Output" "Target" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" )
+function check_Path {
+	# ${1}:	Path to validate
+	validPath=0
+	# Check for invalid characters
+	escapedPath="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
+	if [ "${1}" != "${escapedPath}" ] ; then
+		printf "\nThe specified path cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validPath=1 ; return 1
+	fi
+	# Check that it's absolute
+	relativePath=`echo "${1}" | awk -F "/" '{print $1}'`
+	if [ -n "${relativePath}" ] ; then
+		printf "\nThe specified path must be absolute, please enter an absolute path\n" ; validPath=1 ; return 1
+	fi
+	# Check the volume exists
+	if echo "${1}" | grep -q "/Volumes/" ; then
+		volumeName=`echo "${1}" | awk -F "/Volumes/" '{print $NF}' | awk -F "/" '{print $1}'`
+		if [ ! -d "/Volumes/${volumeName}" ] ; then
+			printf "\nThe specified volume cannot be found, please enter a valid path\n" ; validPath=1 ; return 1
+		fi
+	fi
+	# Check that the path is not a file
+	if [ -f "${1}" ] ; then
+		printf "\nThe specified path is to a file, please enter a path to a folder\n" ; validPath=1 ; return 1
+	fi
+	# Check that the path is unique
+	if [ "${1}" == "${ConfigurationFolder}" ] || [ "${1}" == "${LibraryFolder}" ] || [ "${1}" == "${PackageFolder}" ] || [ "${1}" == "${MasterFolder}" ] ; then
+		printf "\nThe folders must be unique, please enter a different path\n" ; validPath=1 ; return 1
+	fi
+	return 0
+}
+
+function get_ConfigurationFolder {
+	prefConfigurationFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" 2>/dev/null`
+	if [ -n "${prefConfigurationFolder}" ] ; then
+		if [ -d "${prefConfigurationFolder}" ] ; then
+			ConfigurationFolder="${prefConfigurationFolder}"
+		else
+			printf "Warning:		Configurations Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_ConfigurationFolder {
+	display_Subtitle "Default Folders"
+	printf "Configurations Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
+	if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
+	check_Path "${newConfigurationFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nConfiguration Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
+		if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
+		check_Path "${newConfigurationFolder}"
+	done
+	ConfigurationFolder="${newConfigurationFolder}"
+}
+
+function get_LibraryFolder {
+	prefLibraryFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" 2>/dev/null`
+	if [ -n "${prefLibraryFolder}" ] ; then
+		if [ -d "${prefLibraryFolder}" ] ; then
+			LibraryFolder="${prefLibraryFolder}"
+		else
+			printf "Warning:		Library Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_LibraryFolder {
+	display_Subtitle "Default Folders"
+	printf "Library Folder (${LibraryFolder}): " ; read newLibraryFolder
+	if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
+	check_Path "${newLibraryFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nLibrary Folder (${LibraryFolder}): " ; read newLibraryFolder
+		if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
+		check_Path "${newLibraryFolder}"
+	done
+	LibraryFolder="${newLibraryFolder}"
+}
+
+function get_PackageFolder {
+	prefPackageFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" 2>/dev/null`
+	if [ -n "${prefPackageFolder}" ] ; then
+		if [ -d "${prefPackageFolder}" ] ; then
+			PackageFolder="${prefPackageFolder}"
+		else
+			printf "Warning:		Packages Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_PackageFolder {
+	display_Subtitle "Default Folders"
+	printf "Packages Folder (${PackageFolder}): " ; read newPackageFolder
+	if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
+	check_Path "${newPackageFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nPackage Folder (${PackageFolder}): " ; read newPackageFolder
+		if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
+		check_Path "${newPackageFolder}"
+	done
+	PackageFolder="${newPackageFolder}"
+}
+
+function get_MasterFolder {
+	prefMasterFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" 2>/dev/null`
+	if [ -n "${prefMasterFolder}" ] ; then
+		if [ -d "${prefMasterFolder}" ] ; then
+			MasterFolder="${prefMasterFolder}"
+		else
+			printf "Warning:		Masters Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_MasterFolder {
+	display_Subtitle "Default Folders"
+	printf "Masters Folder (${MasterFolder}): " ; read newMasterFolder
+	if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
+	check_Path "${newMasterFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nMaster Folder (${MasterFolder}): " ; read newMasterFolder
+		if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
+		check_Path "${newMasterFolder}"
+	done
+	MasterFolder="${newMasterFolder}"
+}
+
+function display_DefaultFolders {
+	printf "Configurations:		${ConfigurationFolder}\n"
+	printf "Library:		${LibraryFolder}\n"
+	printf "Packages:		${PackageFolder}\n"
+	printf "Masters:		${MasterFolder}\n"
+	printf "\n"
+}
+
+function save_DefaultFolders {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" -string "${ConfigurationFolder}"
+	if [ ! -d "${ConfigurationFolder}" ] ; then mkdir -p "${ConfigurationFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" -string "${LibraryFolder}"
+	if [ ! -d "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" -string "${PackageFolder}"
+	if [ ! -d "${PackageFolder}" ] ; then mkdir -p "${PackageFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" -string "${MasterFolder}"
+	if [ ! -d "${MasterFolder}" ] ; then mkdir -p "${MasterFolder}" ; fi
+}
+
+function menu_DefaultFolders {
+	FolderOptions=( "Preferences Menu" "Configurations" "Library" "Packages" "Masters" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Default Folders"
+		display_DefaultFolders
 		display_Options "Options" "Select an option: "
-		select Option in "${Options[@]}" ; do
+		select Option in "${FolderOptions[@]}" ; do
 			case "${Option}" in
-				"Exit" ) break ;;
-				"Save Settings" ) save_Settings ; Option="" ; break ;;
-				"Display Output" ) display_Output ; Option="" ; break ;;
-				"Target" ) get_Volumes ; select_Target ; Option="" ; break ;;
-				"Language" ) select_Language ; Option="" ; break ;;
-				"Country" ) select_Country ; Option="" ; break ;;
-				"Keyboard" ) select_Keyboard ; Option="" ; break ;;
-				"Location Services" ) select_LocationServices ; Option="" ; break ;;
-				"Network Time Server" ) select_NTPServer ; Option="" ; break ;;
-				"Time Zone" ) select_TimeZone ; Option="" ; break ;;
-				"Remote Login" ) select_RemoteLogin ; Option="" ; break ;;
-				"Remote Management" ) select_RemoteManagement ; Option="" ; break ;;
+				"Preferences Menu" ) break ;;
+				"Configurations" ) set_ConfigurationFolder ; unset Option ; break ;;
+				"Library" ) set_LibraryFolder ; unset Option ; break ;;
+				"Packages" ) set_PackageFolder ; unset Option ; break ;;
+				"Masters" ) set_MasterFolder ; unset Option ; break ;;
 			esac
 		done
 	done
-	Option=""
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_DefaultFolders ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
 }
 
+function get_ImageSize {
+	prefImageSize=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ImageSize" 2>/dev/null`
+	if [ -n "${prefImageSize}" ] ; then ImageSize="${prefImageSize}" ; fi
+}
+
+function check_Size {
+	# ${1}:	Size to validate
+	validSize=0
+	# Remove invalid characters
+	newImageSize="${1//[^0-9.]/}"
+	# Validate the clean string to ensure its numeric
+	isValid=$( echo "scale=0; ${newImageSize}/${newImageSize} + 1" | bc -l 2>/dev/null )
+	if [ ${isValid} -gt 1 ] ; then
+		# Check that it's larger than 5 GB
+		if [ $( echo "${newImageSize} < ${minImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nMac OS X requires at least \033[1m${minImageSize}\033[m GB of free space to install.\n" ; ImageSize="${minImageSize}" ; validSize=1 ; return 1 ; fi
+		# Check that it's smaller than 2 TB
+		if [ $( echo "${newImageSize} > ${maxImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nThe maximum image size is \033[1m${maxImageSize}\033[m GB.\n" ; ImageSize="${maxImageSize}" ; validSize=1 ; return 1 ; fi
+		return 0
+	else
+		printf "\n\033[1m${1}\033[m is not a valid value, please enter a numeric value.\n" ; validSize=1 ; return 1
+	fi
+}
+
+function set_ImageSize {
+	display_Subtitle "Image Settings"
+	printf "Image Size (${ImageSize}): " ; read newImageSize
+	if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
+	check_Size "${newImageSize}"
+	while [ ${validSize} -ne 0 ] ; do
+		printf "\nImage Size (${ImageSize} GB): " ; read newImageSize
+		if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
+		check_Size "${newImageSize}"
+	done
+	ImageSize="${newImageSize}"
+}
+
+function get_VolumeName {
+	prefVolumeName=`defaults read ~/Library/Preferences/au.com.mondada.SIC "VolumeName" 2>/dev/null`
+	if [ -n "${prefVolumeName}" ] ; then VolumeName="${prefVolumeName}" ; fi
+}
+
+function check_VolumeName {
+	# ${1}:	Volume Name to validate
+	validName=0
+	# Check for invalid characters
+	escapedName="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
+	if [ "${1}" != "${escapedName}" ] ; then printf "\nThe volume name cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validName=1 ; return 1 ; fi
+	return 0
+}
+
+function set_VolumeName {
+	display_Subtitle "Image Settings"
+	printf "Volume Name (${VolumeName}): " ; read newVolumeName
+	if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
+	newVolumeName="${newVolumeName//\//:}"
+	check_VolumeName "${newVolumeName}"
+	while [ ${validName} -ne 0 ] ; do
+		printf "Volume Name (${VolumeName}): " ; read newVolumeName
+		if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
+		newVolumeName="${newVolumeName//\//:}"
+		check_VolumeName "${newVolumeName}"
+	done
+	VolumeName="${newVolumeName}"
+}
+
+function display_ImageSettings {
+	printf "Image Size:	${ImageSize} GB\n"
+	printf "Volume Name:	${VolumeName}\n"
+	printf "\n"
+}
+
+function save_ImageSettings {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ImageSize" -float "${ImageSize}"
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "VolumeName" -string "${VolumeName}"
+}
+
+function menu_ImageSettings {
+	ImageOptions=( "Preferences Menu" "Image Size" "Volume Name" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Image Settings"
+		display_ImageSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${ImageOptions[@]}" ; do
+			case "${Option}" in
+				"Preferences Menu" ) break ;;
+				"Image Size" ) set_ImageSize ; unset Option ; break ;;
+				"Volume Name" ) set_VolumeName ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_ImageSettings ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
+}
+
+function get_ExportType {
+	prefExportType=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ExportType" 2>/dev/null`
+	if [ -n "${prefExportType}" ] ; then ExportType="${prefExportType}" ; fi
+}
+
+function display_RecoveryPartition {
+	printf "	["
+	if [ ${ExportType} -eq 1 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Include Recovery Partition in Master\n"
+	printf "	["
+	if [ ${ExportType} -eq 2 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Remove Recovery Partition from Master\n"
+	printf "	["
+	if [ ${ExportType} -eq 3 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Create separate image for Recovery Partition\n"
+	printf "\n"
+}
+
+function set_RecoveryPartition {
+	RecoveryOptions=( "Include Recovery Partition in Master" "Remove Recovery Partition from Master" "Create separate image for Recovery Partition" )
+	display_Subtitle "Export Settings"
+	display_RecoveryPartition
+	display_Options "Options" "Select an option: "
+	select Option in "${RecoveryOptions[@]}" ; do
+		case "${Option}" in
+			"Include Recovery Partition in Master" ) ExportType=1 ; break ;;
+			"Remove Recovery Partition from Master" ) ExportType=2 ; break ;;
+			"Create separate image for Recovery Partition" ) ExportType=3 ; break ;;
+		esac
+	done
+	unset Option
+}
+
+function get_ScanImage {
+	prefScanImage=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ScanImage" 2>/dev/null`
+	if [ -n "${prefScanImage}" ] ; then ScanImage="${prefScanImage}" ; fi
+}
+
+function display_ScanImage {
+	printf "	["
+	if [ ${ScanImage} -eq 1 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Scan masters for restore\n"
+	printf "\n"
+}
+
+function set_ScanImage {
+	display_Subtitle "Export Settings"
+	display_ScanImage
+	while [ -z "${ASR}" ] ; do
+		read -sn 1 -p "Scan masters for restore (Y/n)? " ASR < /dev/tty
+		if [ -z "${ASR}" ] ; then ASR="y" ; fi
+		case "${ASR}" in
+			"Y" | "y" ) echo ; ScanImage=1 ;;
+			"N" | "n" ) echo ; ScanImage=0 ;;
+			* ) echo ; unset ASR ;;
+		esac
+	done
+	unset ASR
+}
+
+function display_ExportSettings {
+	display_RecoveryPartition
+	display_ScanImage
+}
+
+function save_ExportSettings {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ExportType" -int ${ExportType}
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ScanImage" -int ${ScanImage}
+}
+
+function menu_ExportSettings {
+	ExportOptions=( "Preferences Menu" "Recovery Partition" "Scan for Restore" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Export Settings"
+		display_ExportSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${ExportOptions[@]}" ; do
+			case "${Option}" in
+				"Preferences Menu" ) break ;;
+				"Recovery Partition" ) set_RecoveryPartition ; unset Option ; break ;;
+				"Scan for Restore" ) set_ScanImage ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_ExportSettings ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
+}
+
+function menu_Preferences {
+	PrefOptions=( "Main Menu" "Default Folders" "Image Settings" "Export Settings" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		display_Subtitle "Preferences"
+		display_Options "Options" "Select an option: "
+		select Option in "${PrefOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Default Folders" ) menu_DefaultFolders ; unset Option ; break ;;
+				"Image Settings" ) menu_ImageSettings ; unset Option ; break ;;
+				"Export Settings" ) menu_ExportSettings ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function detect_Sources {
+	unset SourceVersions[@]
+	unset SourceVolumes[@]
+	unset SourceTypes[@]
+	unset ImageNames[@]
+	IFS=$'\n'
+	Volumes=( `df | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
+	unset IFS
+	for Volume in "${Volumes[@]}" ; do
+		if [ ! -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] && [ -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] ; then
+			SourceOSMinor=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $2}'`
+			SourceOSPoint=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $3}'`
+			if [ -z "${SourceOSPoint}" ] ; then SourceOSPoint=0 ; fi
+			case ${SourceOSMinor} in
+				5 ) OSname="leopard" ;;
+				6 ) OSname="snowleopard" ;;
+				7 ) OSname="lion" ;;
+				8 ) OSname="mountainlion" ;;
+			esac
+			if [ -e "/Volumes/${Volume}/System/Library/CoreServices/ServerVersion.plist" ] || [ -e "/Volumes/${Volume}/Applications/Server.app" ] || [ -e "/Volumes/${Volume}/Packages/Server.pkg" ] ; then
+				ProductName="Mac OS X Server"
+				ProductType="server"
+			else
+				ProductName="Mac OS X"
+				ProductType="user"
+			fi
+			ProductVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion`
+			ProductBuildVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+			if [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then
+				if [ ${SourceOSMinor} -eq ${SystemOSMinor} ] ; then
+					if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] ; then
+						if [ ${SourceOSPoint} -gt 3 ] ; then
+							SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+							SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+							SourceTypes=( ${SourceTypes[@]} 1 )
+							ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+						fi
+					else
+						SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+						SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+						SourceTypes=( ${SourceTypes[@]} 1 )
+						ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+					fi
+				fi
+			else
+				SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion})" )
+				SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+				SourceTypes=( ${SourceTypes[@]} 0 )
+				ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+			fi
+		fi
+	done
+}
+
+function display_Source {
+	printf "Source:		"
+	if [ -n "${SourceVersion}" ] ; then printf "${SourceVersion}" ; else printf "-" ; fi
+	printf "\n"
+	printf "\n"
+}
+
+function select_Source {
+	detect_Sources
+	display_Subtitle "Select Source"
+	if [ ${#SourceVersions[@]} -eq 0 ] ; then
+		unset SourceVersion
+		unset SourceVolume
+		press_anyKey "No sources available, please insert or mount an OS X Installer, or attach or mount an un-booted system volume."
+	else
+		display_Source
+		display_Options "Sources" "Select a source: "
+		select SourceVersion in "${SourceVersions[@]}" ; do
+			if [ -n "${SourceVersion}" ] ; then break ; fi
+		done
+		i=0 ; for Element in "${SourceVersions[@]}" ; do
+			if [ "${Element}" == "${SourceVersion}" ] ; then
+				SourceVolume="${SourceVolumes[i]}"
+				SourceType=${SourceTypes[i]}
+				ImageName="${ImageNames[i]}"
+				break
+			fi
+			let i++
+		done
+	fi
+}
+
+function install_Package {
+	# ${1}: Path to package
+	# ${2}: Installation volume
+	unset allowUntrusted
+	if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] || [ ${SystemOSMinor} -gt 7 ] ; then allowUntrusted="-allowUntrusted" ; fi
+	if [ -e "${1}" ] ; then
+		if [ "${1}" == "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+			InstallType=0
+		else
+			while [ -z "${Customize}" ] ; do
+				echo
+				read -sn 1 -p "Customize Installation (y/N)? " Customize < /dev/tty
+				if [ -z "${Customize}" ] ; then Customize="n" ; fi ; echo
+				case "${Customize}" in
+					"Y" | "y" ) InstallType=1 ; break ;;
+					"N" | "n" ) InstallType=0 ; break ;;
+					* ) Customize="" ;;
+				esac
+				echo
+			done
+		fi
+		Customize=""
+		IFS=$'\n'
+		PackageTitles=( `installer -pkginfo -pkg "${1}"` )
+		unset IFS
+		s=1
+		if [ ${InstallType} -eq 1 ] ; then
+			printf "\ninstaller: Package name is ${PackageTitles[0]}\n"
+			open "${1}"
+			printf "installer:PHASE:Waiting for installation to complete…\n"
+			while [ `ps eax | grep -i "Installer.app" | grep -v "grep" | awk '{print $1}'` ] ; do
+				printf "\b${spin:s++%${#spin}:1}"
+			done
+			printf "\binstaller: The install is complete.\n"
+		else
+			unset Previous
+			unset InstallerStatus
+			unset InstallerProgress
+			installer -verboseR "${allowUntrusted}" -pkg "${1}" -target "/Volumes/${2}" 2>/dev/null | while read Line ; do
+				if echo "${Line}" | grep -q "installer: " ; then printf "${Line}\n" ; fi
+				if echo "${Line}" | grep -q "\(installer:PHASE:\|installer:STATUS:\)" ; then
+					if [ "${InstallerStatus}" != "${Line}" ] ; then
+						InstallerStatus="${Line}"
+						if echo "${Previous}" | grep -q "installer:%" ; then
+							printf "\n${InstallerStatus}\n"
+						else
+							printf "${InstallerStatus}\n"
+						fi
+					fi
+				fi
+				if echo "${Line}" | grep -q "installer:%" ; then
+					if [ "${InstallerProgress}" != "${Line}" ] ; then
+						InstallerProgress="${Line//%/%%}"
+						printf "\r${InstallerProgress}"
+					fi
+				fi
+				Previous="${Line}"
+			done
+			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+				press_anyKey
+			fi
+		fi
+	else
+		press_anyKey "The package selection is invalid, please review your settings."
+	fi
+}
+
+function create_Image {
+	display_Subtitle "Create Image"
+	if [ -z "${SourceVersion}" ] ; then press_anyKey "No source selected, please select a source first." ; return 1 ; fi
+	while [ -e "${LibraryFolder}/${ImageName}.dmg" ] ; do
+		printf "An image already exists named \033[1m${ImageName}.dmg\033[m.\n"
+		read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty ; echo
+		if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
+		case "${Overwrite}" in
+			"Y" | "y" ) echo ; rm -f "${LibraryFolder}/${ImageName}.dmg" ; break ;;
+			"N" | "n" ) echo ; break ;;
+		esac
+	done
+	Overwrite=""
+	if [ ! -e "${LibraryFolder}/${ImageName}.dmg" ] ; then
+		Removables=(
+			".Spotlight-V100"
+			".Trashes"
+			".fseventsd"
+		)
+		if [ ! -e "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; chown 99:99 "${LibraryFolder}" ; fi
+		if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
+			hdiutil create -size "${ImageSize}g" -type SPARSE -fs HFS+J -volname "${VolumeName}" "/tmp/${ImageName}.sparseimage"
+			InstallTarget=`hdiutil attach -owners on -noverify "/tmp/${ImageName}.sparseimage" | grep "/Volumes/${VolumeName}" | awk -F "/Volumes/" '{print $NF}'`
+			chown 0:80 "/Volumes/${InstallTarget}"
+			chmod 1775 "/Volumes/${InstallTarget}"
+			if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] ; then
+				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${InstallTarget}"
+			else
+				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${InstallTarget}"
+			fi
+			bless --folder "/Volumes/${InstallTarget}/System/Library/CoreServices" --bootefi 2>/dev/null
+			touch "/Volumes/${InstallTarget}/private/var/db/.RunLanguageChooserToo"
+			for Removable in "${Removables[@]}" ; do
+				if [ -e "/Volumes/${InstallTarget}/${Removable}" ] ; then rm -rf "/Volumes/${InstallTarget}/${Removable}" ; fi
+			done
+			Device=`diskutil info "/Volumes/${InstallTarget}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			diskutil unmountDisk force "/dev/${Device}" &>/dev/null
+			printf "Unmount of all volumes on ${Device} was successful\n"
+			diskutil eject "/dev/${Device}" &>/dev/null
+			printf "Disk /dev/${Device} ejected\n"
+			hdiutil convert -format UDZO "/tmp/${ImageName}.sparseimage" -o "${LibraryFolder}/${ImageName}.dmg"
+			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
+			echo
+			press_anyKey
+		else
+			for Removable in "${Removables[@]}" ; do
+				if [ -e "/Volumes/${SourceVolume}/${Removable}" ] ; then rm -rf "/Volumes/${SourceVolume}/${Removable}" ; fi
+			done
+			Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			DeviceNodes=`diskutil list "/dev/${Device}" | grep -c "Apple_HFS"`
+			if [ ${DeviceNodes} -gt 1 ] ; then
+				Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Device Node:" | awk -F "/dev/" '{print $NF}'`
+				diskutil unmount force "/dev/${Device}" &>/dev/null
+				printf "Volume ${SourceVolume} on ${Device} unmounted\n"
+			else
+				diskutil unmountDisk force "/dev/${Device}" &>/dev/null
+				printf "Unmount of all volumes on ${Device} was successful\n"
+			fi
+			hdiutil create -srcdevice "/dev/${Device}" -o "${LibraryFolder}/${ImageName}.dmg"
+			diskutil mountDisk "/dev/${Device}"
+			echo
+			press_anyKey
+		fi
+	fi
+}
+
+function menu_CreateImage {
+	CreateOptions=( "Main Menu" "Select Source" "Create Image" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		display_Subtitle "Create Image"
+		display_Source
+		display_Options "Options" "Select an option: "
+		select Option in "${CreateOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Select Source" ) select_Source ; unset Option ; break ;;
+				"Create Image" ) create_Image ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_SystemSettings {
+	SystemOptions=( "Configuration Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
+	while [ "${Option}" != "Configuration Menu" ] ; do
+		display_Subtitle "System Settings"
+		display_SystemSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${SystemOptions[@]}" ; do
+			case "${Option}" in
+				"Configuration Menu" ) break ;;
+				"Language" ) select_Language ; unset Option ; break ;;
+				"Country" ) select_Country ; unset Option ; break ;;
+				"Keyboard" ) select_Keyboard ; unset Option ; break ;;
+				"Location Services" ) set_LocationServices ; unset Option ; break ;;
+				"Network Time Server" ) select_NTPServer ; unset Option ; break ;;
+				"Time Zone" ) select_TimeZone ; unset Option ; break ;;
+				"Remote Login" ) select_RemoteLogin ; unset Option ; break ;;
+				"Remote Management" ) select_RemoteManagement ; unset Option ; break ;;
+				"Computer Name" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_AddUser {
+	AddUserOptions=( "User Accounts Menu" "Full Name" "Account Name" "User ID" "Password" "Automatic Login" "Password Hint" "Login shell" "Home Directory" )
+	while [ "${Option}" != "User Accounts Menu" ] ; do
+		display_Subtitle "Add User"
+		display_Options "Options" "Select an option: "
+		select Option in "${AddUserOptions[@]}" ; do
+			case "${Option}" in
+				"User Accounts Menu" ) break ;;
+				"Full Name" ) not_Implemented ; unset Option ; break ;;
+				"Account Name" ) not_Implemented ; unset Option ; break ;;
+				"User ID" ) not_Implemented ; unset Option ; break ;;
+				"Password" ) not_Implemented ; unset Option ; break ;;
+				"Automatic Login" ) not_Implemented ; unset Option ; break ;;
+				"Password Hint" ) not_Implemented ; unset Option ; break ;;
+				"Login shell" ) not_Implemented ; unset Option ; break ;;
+				"Home Directory" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_EditUser {
+	EditUserOptions=( "User Accounts Menu" "Select User" )
+	while [ "${Option}" != "User Accounts Menu" ] ; do
+		display_Subtitle "Edit User"
+		display_Options "Options" "Select an option: "
+		select Option in "${EditUserOptions[@]}" ; do
+			case "${Option}" in
+				"User Accounts Menu" ) break ;;
+				"Select User" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_DeleteUser {
+	DeleteUserOptions=( "User Accounts Menu" "Select User" )
+	while [ "${Option}" != "User Accounts Menu" ] ; do
+		display_Subtitle "Delete User"
+		display_Options "Options" "Select an option: "
+		select Option in "${EditUserOptions[@]}" ; do
+			case "${Option}" in
+				"User Accounts Menu" ) break ;;
+				"Select User" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_UserAccounts {
+	AccountOptions=( "Configuration Menu" "Add User" "Edit User" "Delete User" )
+	while [ "${Option}" != "Configuration Menu" ] ; do
+		display_Subtitle "User Accounts"
+		display_Options "Options" "Select an option: "
+		select Option in "${AccountOptions[@]}" ; do
+			case "${Option}" in
+				"Configuration Menu" ) break ;;
+				"Add User" ) menu_AddUser ; unset Option ; break ;;
+				"Edit User" ) menu_EditUser ; unset Option ; break ;;
+				"Delete User" ) menu_DeleteUser ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+function menu_Configure {
+	ConfigureOptions=( "Main Menu" "Load Configuration" "Save Configuration" "Select Target" "System Settings" "User Accounts" "Install Packages" "Apply Configuration" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		display_Subtitle "Configure System"
+		display_Options "Options" "Select an option: "
+		select Option in "${ConfigureOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Load Configuration" ) not_Implemented ; unset Option ; break ;;
+				"Save Configuration" ) not_Implemented ; unset Option ; break ;;
+				"Select Target" ) not_Implemented ; unset Option ; break ;;
+				"System Settings" ) menu_SystemSettings ; unset Option ; break ;;
+				"User Accounts" ) menu_UserAccounts ; unset Option ; break ;;
+				"Install Packages" ) not_Implemented ; unset Option ; break ;;
+				"Apply Configuration" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+}
+
+function main_Menu {
+	while [ "${Option}" != "Exit" ] ; do
+		display_Subtitle "Main Menu"
+		Options=( "Exit" "Help" "Preferences" "Create Image" "Configure System" )
+		display_Options "Options" "Select an option: "
+		select Option in "${Options[@]}" ; do
+			case "${Option}" in
+				"Exit" ) echo ; exit 0 ;;
+				"Help" ) not_Implemented ; unset Option ; break ;;
+				"Preferences" ) menu_Preferences ; unset Option ; break ;;
+				"Create Image" ) menu_CreateImage ; unset Option ; break ;;
+				"Configure System" ) menu_Configure ; unset Option ; break ;;
+			esac
+		done
+	done
+}
+
+privelege_Check
 get_LicenseStatus
 menu_License
+set_SystemOSVersion
+get_ConfigurationFolder
+get_LibraryFolder
+get_PackageFolder
+get_MasterFolder
+get_VolumeName
+get_ImageSize
 #set_Target
-set_OSVersion
+set_TargetOSVersion
 get_Language
 set_LanguageCountryCodes "${LanguageCode}"
 set_OtherCountryCodes
@@ -4614,7 +5408,7 @@ get_NTPSettings
 get_GeonameID
 get_RemoteLogin
 get_RemoteManagement
-menu_Configuration
+main_Menu
 #display_Output
 
 exit 0
