@@ -5,6 +5,8 @@ function not_Implemented {
 	sleep 2
 }
 
+# To Do:
+
 # Default Base Folder
 BaseFolder="/Users/Shared/SIC"
 # Default Configurations Folder
@@ -31,7 +33,7 @@ ScanImage=1
 FirstBootPath="/usr/libexec/FirstBoot"
 
 # Version
-SICVersion="1.5a0"
+SICVersion="1.5a1"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -5021,8 +5023,8 @@ function menu_Preferences {
 
 function detect_Sources {
 	unset SourceVersions[@]
+	unset SourceBuilds[@]
 	unset SourceVolumes[@]
-	unset SourceTypes[@]
 	unset ImageNames[@]
 	IFS=$'\n'
 	Volumes=( `df | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
@@ -5052,21 +5054,21 @@ function detect_Sources {
 					if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] ; then
 						if [ ${SourceOSPoint} -gt 3 ] ; then
 							SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+							SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
 							SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-							SourceTypes=( ${SourceTypes[@]} 1 )
 							ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
 						fi
 					else
 						SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+						SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
 						SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-						SourceTypes=( ${SourceTypes[@]} 1 )
 						ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
 					fi
 				fi
 			else
 				SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion})" )
+				SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
 				SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-				SourceTypes=( ${SourceTypes[@]} 0 )
 				ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
 			fi
 		fi
@@ -5076,6 +5078,8 @@ function detect_Sources {
 function display_Source {
 	printf "Source:		"
 	if [ -n "${SourceVersion}" ] ; then printf "${SourceVersion}" ; else printf "-" ; fi
+	printf "\nImage Name:	"
+	if [ -n "${ImageName}" ] ; then printf "${ImageName}.dmg" ; else printf "-" ; fi
 	printf "\n"
 	printf "\n"
 }
@@ -5085,7 +5089,9 @@ function select_Source {
 	display_Subtitle "Select Source"
 	if [ ${#SourceVersions[@]} -eq 0 ] ; then
 		unset SourceVersion
+		unset SourceBuild
 		unset SourceVolume
+		unset ImageName
 		press_anyKey "No sources available, please insert or mount an OS X Installer, or attach or mount an un-booted system volume."
 	else
 		display_Source
@@ -5096,7 +5102,7 @@ function select_Source {
 		i=0 ; for Element in "${SourceVersions[@]}" ; do
 			if [ "${Element}" == "${SourceVersion}" ] ; then
 				SourceVolume="${SourceVolumes[i]}"
-				SourceType=${SourceTypes[i]}
+				SourceBuild="${SourceBuilds[i]}"
 				ImageName="${ImageNames[i]}"
 				break
 			fi
@@ -5174,7 +5180,11 @@ function install_Package {
 
 function create_Image {
 	display_Subtitle "Create Image"
+	display_Source
 	if [ -z "${SourceVersion}" ] ; then press_anyKey "No source selected, please select a source first." ; return 1 ; fi
+	if [ ! -e "/Volumes/${SourceVolume}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
+	ProductBuildVersion=`defaults read "/Volumes/${SourceVolume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+	if [ "${SourceBuild}" != "${ProductBuildVersion}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
 	while [ -e "${LibraryFolder}/${ImageName}.dmg" ] ; do
 		printf "An image already exists named \033[1m${ImageName}.dmg\033[m.\n"
 		read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty ; echo
@@ -5239,11 +5249,24 @@ function create_Image {
 	fi
 }
 
+function display_LibraryImages {
+	IFS=$'\n'
+	LibraryImages=( `ls "${LibraryFolder}" | grep "\.dmg"` )
+	unset IFS
+	printf "Library Images:	${LibraryImages[0]}\n"
+	i=0 ; for Image in "${LibraryImages[@]}" ; do
+		if [ ${i} -ne 0 ] ; then printf "		${Image}\n" ; fi
+		let i++
+	done
+	printf "\n"
+}
+
 function menu_CreateImage {
 	CreateOptions=( "Main Menu" "Select Source" "Create Image" )
 	while [ "${Option}" != "Main Menu" ] ; do
 		display_Subtitle "Create Image"
 		display_Source
+		display_LibraryImages
 		display_Options "Options" "Select an option: "
 		select Option in "${CreateOptions[@]}" ; do
 			case "${Option}" in
@@ -5253,7 +5276,21 @@ function menu_CreateImage {
 			esac
 		done
 	done
+	unset SourceVersion
+	unset SourceBuild
+	unset SourceVolume
+	unset ImageName
 	unset Option
+}
+
+function load_Configuration {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
+
+function save_Configuration {
+	display_Subtitle "Function not Implemented"
+	sleep 2
 }
 
 function menu_SystemSettings {
@@ -5349,6 +5386,16 @@ function menu_UserAccounts {
 	unset Option
 }
 
+function menu_Packages {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
+
+function apply_Configuration {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
+
 function menu_Configure {
 	ConfigureOptions=( "Main Menu" "Load Configuration" "Save Configuration" "Select Target" "System Settings" "User Accounts" "Install Packages" "Apply Configuration" )
 	while [ "${Option}" != "Main Menu" ] ; do
@@ -5357,13 +5404,13 @@ function menu_Configure {
 		select Option in "${ConfigureOptions[@]}" ; do
 			case "${Option}" in
 				"Main Menu" ) break ;;
-				"Load Configuration" ) not_Implemented ; unset Option ; break ;;
-				"Save Configuration" ) not_Implemented ; unset Option ; break ;;
-				"Select Target" ) not_Implemented ; unset Option ; break ;;
+				"Load Configuration" ) load_Configuration ; unset Option ; break ;;
+				"Save Configuration" ) save_Configuration ; unset Option ; break ;;
+				"Select Target" ) select_Target ; unset Option ; break ;;
 				"System Settings" ) menu_SystemSettings ; unset Option ; break ;;
 				"User Accounts" ) menu_UserAccounts ; unset Option ; break ;;
-				"Install Packages" ) not_Implemented ; unset Option ; break ;;
-				"Apply Configuration" ) not_Implemented ; unset Option ; break ;;
+				"Install Packages" ) menu_Packages ; unset Option ; break ;;
+				"Apply Configuration" ) apply_Configuration ; unset Option ; break ;;
 			esac
 		done
 	done
