@@ -5,8 +5,6 @@ function not_Implemented {
 	sleep 2
 }
 
-# To Do:
-
 # Default Base Folder
 BaseFolder="/Users/Shared/SIC"
 # Default Configurations Folder
@@ -76,24 +74,12 @@ function press_anyKey {
 	echo
 }
 
-function set_SystemOSVersion {
+function get_SystemOSVersion {
 	SystemOSMajor=`sw_vers -productVersion | awk -F "." '{print $1}'`
 	SystemOSMinor=`sw_vers -productVersion | awk -F "." '{print $2}'`
 	SystemOSPoint=`sw_vers -productVersion | awk -F "." '{print $3}'`
 	if [ -z "${SystemOSPoint}" ] ; then SystemOSPoint=0 ; fi
 	SystemOSBuild=`sw_vers -buildVersion`
-}
-
-function set_TargetOSVersion {
-	TargetOSMajor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $1}'`
-	TargetOSMinor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
-	TargetOSPoint=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $3}'`
-	if [ -z "${TargetOSPoint}" ] ; then TargetOSPoint=0 ; fi
-	TargetOSBuild=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductBuildVersion"`
-	case ${TargetOSMinor} in
-		6 | 7 ) PLACES="ZGEOPLACE" ;;
-		8 ) PLACES="ZGEOKITPLACE" ;;
-	esac
 }
 
 # Section: License & Copyright
@@ -150,17 +136,715 @@ function menu_License {
 	fi
 }
 
+# Section: Help
+
+# Section: Preferences
+
+function check_Path {
+	# ${1}:	Path to validate
+	validPath=0
+	# Check for invalid characters
+	escapedPath="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
+	if [ "${1}" != "${escapedPath}" ] ; then
+		printf "\nThe specified path cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validPath=1 ; return 1
+	fi
+	# Check that it's absolute
+	relativePath=`echo "${1}" | awk -F "/" '{print $1}'`
+	if [ -n "${relativePath}" ] ; then
+		printf "\nThe specified path must be absolute, please enter an absolute path\n" ; validPath=1 ; return 1
+	fi
+	# Check the volume exists
+	if echo "${1}" | grep -q "/Volumes/" ; then
+		volumeName=`echo "${1}" | awk -F "/Volumes/" '{print $NF}' | awk -F "/" '{print $1}'`
+		if [ ! -d "/Volumes/${volumeName}" ] ; then
+			printf "\nThe specified volume cannot be found, please enter a valid path\n" ; validPath=1 ; return 1
+		fi
+	fi
+	# Check that the path is not a file
+	if [ -f "${1}" ] ; then
+		printf "\nThe specified path is to a file, please enter a path to a folder\n" ; validPath=1 ; return 1
+	fi
+	# Check that the path is unique
+	if [ "${1}" == "${ConfigurationFolder}" ] || [ "${1}" == "${LibraryFolder}" ] || [ "${1}" == "${PackageFolder}" ] || [ "${1}" == "${MasterFolder}" ] ; then
+		printf "\nThe folders must be unique, please enter a different path\n" ; validPath=1 ; return 1
+	fi
+	return 0
+}
+
+function get_ConfigurationFolder {
+	prefConfigurationFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" 2>/dev/null`
+	if [ -n "${prefConfigurationFolder}" ] ; then
+		if [ -d "${prefConfigurationFolder}" ] ; then
+			ConfigurationFolder="${prefConfigurationFolder}"
+		else
+			printf "Warning:		Configurations Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_ConfigurationFolder {
+	display_Subtitle "Default Folders"
+	printf "Configurations Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
+	if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
+	check_Path "${newConfigurationFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nConfiguration Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
+		if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
+		check_Path "${newConfigurationFolder}"
+	done
+	ConfigurationFolder="${newConfigurationFolder}"
+}
+
+function get_LibraryFolder {
+	prefLibraryFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" 2>/dev/null`
+	if [ -n "${prefLibraryFolder}" ] ; then
+		if [ -d "${prefLibraryFolder}" ] ; then
+			LibraryFolder="${prefLibraryFolder}"
+		else
+			printf "Warning:		Library Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_LibraryFolder {
+	display_Subtitle "Default Folders"
+	printf "Library Folder (${LibraryFolder}): " ; read newLibraryFolder
+	if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
+	check_Path "${newLibraryFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nLibrary Folder (${LibraryFolder}): " ; read newLibraryFolder
+		if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
+		check_Path "${newLibraryFolder}"
+	done
+	LibraryFolder="${newLibraryFolder}"
+}
+
+function get_PackageFolder {
+	prefPackageFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" 2>/dev/null`
+	if [ -n "${prefPackageFolder}" ] ; then
+		if [ -d "${prefPackageFolder}" ] ; then
+			PackageFolder="${prefPackageFolder}"
+		else
+			printf "Warning:		Packages Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_PackageFolder {
+	display_Subtitle "Default Folders"
+	printf "Packages Folder (${PackageFolder}): " ; read newPackageFolder
+	if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
+	check_Path "${newPackageFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nPackage Folder (${PackageFolder}): " ; read newPackageFolder
+		if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
+		check_Path "${newPackageFolder}"
+	done
+	PackageFolder="${newPackageFolder}"
+}
+
+function get_MasterFolder {
+	prefMasterFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" 2>/dev/null`
+	if [ -n "${prefMasterFolder}" ] ; then
+		if [ -d "${prefMasterFolder}" ] ; then
+			MasterFolder="${prefMasterFolder}"
+		else
+			printf "Warning:		Masters Folder missing, reverting to default\n"
+		fi
+	fi
+}
+
+function set_MasterFolder {
+	display_Subtitle "Default Folders"
+	printf "Masters Folder (${MasterFolder}): " ; read newMasterFolder
+	if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
+	check_Path "${newMasterFolder}"
+	while [ ${validPath} -ne 0 ] ; do
+		printf "\nMaster Folder (${MasterFolder}): " ; read newMasterFolder
+		if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
+		check_Path "${newMasterFolder}"
+	done
+	MasterFolder="${newMasterFolder}"
+}
+
+function display_DefaultFolders {
+	printf "Configurations:		${ConfigurationFolder}\n"
+	printf "Library:		${LibraryFolder}\n"
+	printf "Packages:		${PackageFolder}\n"
+	printf "Masters:		${MasterFolder}\n"
+	printf "\n"
+}
+
+function save_DefaultFolders {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" -string "${ConfigurationFolder}"
+	if [ ! -d "${ConfigurationFolder}" ] ; then mkdir -p "${ConfigurationFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" -string "${LibraryFolder}"
+	if [ ! -d "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" -string "${PackageFolder}"
+	if [ ! -d "${PackageFolder}" ] ; then mkdir -p "${PackageFolder}" ; fi
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" -string "${MasterFolder}"
+	if [ ! -d "${MasterFolder}" ] ; then mkdir -p "${MasterFolder}" ; fi
+}
+
+function menu_DefaultFolders {
+	FolderOptions=( "Preferences Menu" "Configurations" "Library" "Packages" "Masters" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Default Folders"
+		display_DefaultFolders
+		display_Options "Options" "Select an option: "
+		select Option in "${FolderOptions[@]}" ; do
+			case "${Option}" in
+				"Preferences Menu" ) break ;;
+				"Configurations" ) set_ConfigurationFolder ; unset Option ; break ;;
+				"Library" ) set_LibraryFolder ; unset Option ; break ;;
+				"Packages" ) set_PackageFolder ; unset Option ; break ;;
+				"Masters" ) set_MasterFolder ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_DefaultFolders ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
+}
+
+function get_ImageSize {
+	prefImageSize=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ImageSize" 2>/dev/null`
+	if [ -n "${prefImageSize}" ] ; then ImageSize="${prefImageSize}" ; fi
+}
+
+function check_Size {
+	# ${1}:	Size to validate
+	validSize=0
+	# Remove invalid characters
+	newImageSize="${1//[^0-9.]/}"
+	# Validate the clean string to ensure its numeric
+	isValid=$( echo "scale=0; ${newImageSize}/${newImageSize} + 1" | bc -l 2>/dev/null )
+	if [ ${isValid} -gt 1 ] ; then
+		# Check that it's larger than 5 GB
+		if [ $( echo "${newImageSize} < ${minImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nMac OS X requires at least \033[1m${minImageSize}\033[m GB of free space to install.\n" ; ImageSize="${minImageSize}" ; validSize=1 ; return 1 ; fi
+		# Check that it's smaller than 2 TB
+		if [ $( echo "${newImageSize} > ${maxImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nThe maximum image size is \033[1m${maxImageSize}\033[m GB.\n" ; ImageSize="${maxImageSize}" ; validSize=1 ; return 1 ; fi
+		return 0
+	else
+		printf "\n\033[1m${1}\033[m is not a valid value, please enter a numeric value.\n" ; validSize=1 ; return 1
+	fi
+}
+
+function set_ImageSize {
+	display_Subtitle "Image Settings"
+	printf "Image Size (${ImageSize}): " ; read newImageSize
+	if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
+	check_Size "${newImageSize}"
+	while [ ${validSize} -ne 0 ] ; do
+		printf "\nImage Size (${ImageSize} GB): " ; read newImageSize
+		if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
+		check_Size "${newImageSize}"
+	done
+	ImageSize="${newImageSize}"
+}
+
+function get_VolumeName {
+	prefVolumeName=`defaults read ~/Library/Preferences/au.com.mondada.SIC "VolumeName" 2>/dev/null`
+	if [ -n "${prefVolumeName}" ] ; then VolumeName="${prefVolumeName}" ; fi
+}
+
+function check_VolumeName {
+	# ${1}:	Volume Name to validate
+	validName=0
+	# Check for invalid characters
+	escapedName="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
+	if [ "${1}" != "${escapedName}" ] ; then printf "\nThe volume name cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validName=1 ; return 1 ; fi
+	return 0
+}
+
+function set_VolumeName {
+	display_Subtitle "Image Settings"
+	printf "Volume Name (${VolumeName}): " ; read newVolumeName
+	if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
+	newVolumeName="${newVolumeName//\//:}"
+	check_VolumeName "${newVolumeName}"
+	while [ ${validName} -ne 0 ] ; do
+		printf "Volume Name (${VolumeName}): " ; read newVolumeName
+		if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
+		newVolumeName="${newVolumeName//\//:}"
+		check_VolumeName "${newVolumeName}"
+	done
+	VolumeName="${newVolumeName}"
+}
+
+function display_ImageSettings {
+	printf "Image Size:	${ImageSize} GB\n"
+	printf "Volume Name:	${VolumeName}\n"
+	printf "\n"
+}
+
+function save_ImageSettings {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ImageSize" -float "${ImageSize}"
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "VolumeName" -string "${VolumeName}"
+}
+
+function menu_ImageSettings {
+	ImageOptions=( "Preferences Menu" "Image Size" "Volume Name" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Image Settings"
+		display_ImageSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${ImageOptions[@]}" ; do
+			case "${Option}" in
+				"Preferences Menu" ) break ;;
+				"Image Size" ) set_ImageSize ; unset Option ; break ;;
+				"Volume Name" ) set_VolumeName ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_ImageSettings ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
+}
+
+function get_ExportType {
+	prefExportType=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ExportType" 2>/dev/null`
+	if [ -n "${prefExportType}" ] ; then ExportType="${prefExportType}" ; fi
+}
+
+function display_RecoveryPartition {
+	printf "	["
+	if [ ${ExportType} -eq 1 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Include Recovery Partition in Master\n"
+	printf "	["
+	if [ ${ExportType} -eq 2 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Remove Recovery Partition from Master\n"
+	printf "	["
+	if [ ${ExportType} -eq 3 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Create separate image for Recovery Partition\n"
+	printf "\n"
+}
+
+function set_RecoveryPartition {
+	RecoveryOptions=( "Include Recovery Partition in Master" "Remove Recovery Partition from Master" "Create separate image for Recovery Partition" )
+	display_Subtitle "Export Settings"
+	display_RecoveryPartition
+	display_Options "Options" "Select an option: "
+	select Option in "${RecoveryOptions[@]}" ; do
+		case "${Option}" in
+			"Include Recovery Partition in Master" ) ExportType=1 ; break ;;
+			"Remove Recovery Partition from Master" ) ExportType=2 ; break ;;
+			"Create separate image for Recovery Partition" ) ExportType=3 ; break ;;
+		esac
+	done
+	unset Option
+}
+
+function get_ScanImage {
+	prefScanImage=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ScanImage" 2>/dev/null`
+	if [ -n "${prefScanImage}" ] ; then ScanImage="${prefScanImage}" ; fi
+}
+
+function display_ScanImage {
+	printf "	["
+	if [ ${ScanImage} -eq 1 ] ; then printf "*" ; else printf " " ; fi
+	printf "] Scan masters for restore\n"
+	printf "\n"
+}
+
+function set_ScanImage {
+	display_Subtitle "Export Settings"
+	display_ScanImage
+	while [ -z "${ASR}" ] ; do
+		read -sn 1 -p "Scan masters for restore (Y/n)? " ASR < /dev/tty
+		if [ -z "${ASR}" ] ; then ASR="y" ; fi
+		case "${ASR}" in
+			"Y" | "y" ) echo ; ScanImage=1 ;;
+			"N" | "n" ) echo ; ScanImage=0 ;;
+			* ) echo ; unset ASR ;;
+		esac
+	done
+	unset ASR
+}
+
+function display_ExportSettings {
+	display_RecoveryPartition
+	display_ScanImage
+}
+
+function save_ExportSettings {
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ExportType" -int ${ExportType}
+	defaults write ~/Library/Preferences/au.com.mondada.SIC "ScanImage" -int ${ScanImage}
+}
+
+function menu_ExportSettings {
+	ExportOptions=( "Preferences Menu" "Recovery Partition" "Scan for Restore" )
+	while [ "${Option}" != "Preferences Menu" ] ; do
+		display_Subtitle "Export Settings"
+		display_ExportSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${ExportOptions[@]}" ; do
+			case "${Option}" in
+				"Preferences Menu" ) break ;;
+				"Recovery Partition" ) set_RecoveryPartition ; unset Option ; break ;;
+				"Scan for Restore" ) set_ScanImage ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+	unset SaveDefaults
+	while [ -z "${SaveDefaults}" ] ; do
+		echo
+		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
+		echo
+		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
+		case "${SaveDefaults}" in
+			"Y" | "y" ) save_ExportSettings ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset SaveDefaults ;;
+		esac
+	done
+	unset SaveDefaults
+}
+
+function menu_Preferences {
+	PrefOptions=( "Main Menu" "Default Folders" "Image Settings" "Export Settings" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		display_Subtitle "Preferences"
+		display_Options "Options" "Select an option: "
+		select Option in "${PrefOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Default Folders" ) menu_DefaultFolders ; unset Option ; break ;;
+				"Image Settings" ) menu_ImageSettings ; unset Option ; break ;;
+				"Export Settings" ) menu_ExportSettings ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+# Section: Create Image
+
+function detect_Sources {
+	unset SourceVersions[@]
+	unset SourceBuilds[@]
+	unset SourceVolumes[@]
+	unset ImageNames[@]
+	IFS=$'\n'
+	Volumes=( `df | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
+	unset IFS
+	for Volume in "${Volumes[@]}" ; do
+		if [ ! -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] && [ -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] ; then
+			SourceOSMinor=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $2}'`
+			SourceOSPoint=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $3}'`
+			if [ -z "${SourceOSPoint}" ] ; then SourceOSPoint=0 ; fi
+			case ${SourceOSMinor} in
+				5 ) OSname="leopard" ;;
+				6 ) OSname="snowleopard" ;;
+				7 ) OSname="lion" ;;
+				8 ) OSname="mountainlion" ;;
+			esac
+			if [ -e "/Volumes/${Volume}/System/Library/CoreServices/ServerVersion.plist" ] || [ -e "/Volumes/${Volume}/Applications/Server.app" ] || [ -e "/Volumes/${Volume}/Packages/Server.pkg" ] ; then
+				ProductName="Mac OS X Server"
+				ProductType="server"
+			else
+				ProductName="Mac OS X"
+				ProductType="user"
+			fi
+			ProductVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion`
+			ProductBuildVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+			if [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then
+				if [ ${SourceOSMinor} -eq ${SystemOSMinor} ] ; then
+					if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] ; then
+						if [ ${SourceOSPoint} -gt 3 ] ; then
+							SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+							SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
+							SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+							ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+						fi
+					else
+						SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
+						SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
+						SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+						ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+					fi
+				fi
+			else
+				SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion})" )
+				SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
+				SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
+				ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
+			fi
+		fi
+	done
+}
+
+function display_Source {
+	printf "Source:		"
+	if [ -n "${SourceVersion}" ] ; then printf "${SourceVersion}" ; else printf "-" ; fi
+	printf "\nImage Name:	"
+	if [ -n "${ImageName}" ] ; then printf "${ImageName}.dmg" ; else printf "-" ; fi
+	printf "\n"
+	printf "\n"
+}
+
+function select_Source {
+	detect_Sources
+	display_Subtitle "Select Source"
+	if [ ${#SourceVersions[@]} -eq 0 ] ; then
+		unset SourceVersion
+		unset SourceBuild
+		unset SourceVolume
+		unset ImageName
+		press_anyKey "No sources available, please insert or mount an OS X Installer, or attach or mount an un-booted system volume."
+	else
+		display_Source
+		display_Options "Sources" "Select a source: "
+		select SourceVersion in "${SourceVersions[@]}" ; do
+			if [ -n "${SourceVersion}" ] ; then break ; fi
+		done
+		i=0 ; for Element in "${SourceVersions[@]}" ; do
+			if [ "${Element}" == "${SourceVersion}" ] ; then
+				SourceVolume="${SourceVolumes[i]}"
+				SourceBuild="${SourceBuilds[i]}"
+				ImageName="${ImageNames[i]}"
+				break
+			fi
+			let i++
+		done
+	fi
+}
+
+function install_Package {
+	# ${1}: Path to package
+	# ${2}: Installation volume
+	unset allowUntrusted
+	if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] || [ ${SystemOSMinor} -gt 7 ] ; then allowUntrusted="-allowUntrusted" ; fi
+	if [ -e "${1}" ] ; then
+		if [ "${1}" == "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+			InstallType=0
+		else
+			while [ -z "${Customize}" ] ; do
+				echo
+				read -sn 1 -p "Customize Installation (y/N)? " Customize < /dev/tty
+				if [ -z "${Customize}" ] ; then Customize="n" ; fi ; echo
+				case "${Customize}" in
+					"Y" | "y" ) InstallType=1 ; break ;;
+					"N" | "n" ) InstallType=0 ; break ;;
+					* ) Customize="" ;;
+				esac
+				echo
+			done
+		fi
+		Customize=""
+		IFS=$'\n'
+		PackageTitles=( `installer -pkginfo -pkg "${1}"` )
+		unset IFS
+		s=1
+		if [ ${InstallType} -eq 1 ] ; then
+			printf "\ninstaller: Package name is ${PackageTitles[0]}\n"
+			open "${1}"
+			printf "installer:PHASE:Waiting for installation to complete…\n"
+			while [ `ps eax | grep -i "Installer.app" | grep -v "grep" | awk '{print $1}'` ] ; do
+				printf "\b${spin:s++%${#spin}:1}"
+			done
+			printf "\binstaller: The install is complete.\n"
+		else
+			unset Previous
+			unset InstallerStatus
+			unset InstallerProgress
+			installer -verboseR "${allowUntrusted}" -pkg "${1}" -target "/Volumes/${2}" 2>/dev/null | while read Line ; do
+				if echo "${Line}" | grep -q "installer: " ; then printf "${Line}\n" ; fi
+				if echo "${Line}" | grep -q "\(installer:PHASE:\|installer:STATUS:\)" ; then
+					if [ "${InstallerStatus}" != "${Line}" ] ; then
+						InstallerStatus="${Line}"
+						if echo "${Previous}" | grep -q "installer:%" ; then
+							printf "\n${InstallerStatus}\n"
+						else
+							printf "${InstallerStatus}\n"
+						fi
+					fi
+				fi
+				if echo "${Line}" | grep -q "installer:%" ; then
+					if [ "${InstallerProgress}" != "${Line}" ] ; then
+						InstallerProgress="${Line//%/%%}"
+						printf "\r${InstallerProgress}"
+					fi
+				fi
+				Previous="${Line}"
+			done
+			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+				press_anyKey
+			fi
+		fi
+	else
+		press_anyKey "The package selection is invalid, please review your settings."
+	fi
+}
+
+function create_Image {
+	display_Subtitle "Create Image"
+	display_Source
+	if [ -z "${SourceVersion}" ] ; then press_anyKey "No source selected, please select a source first." ; return 1 ; fi
+	if [ ! -e "/Volumes/${SourceVolume}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
+	ProductBuildVersion=`defaults read "/Volumes/${SourceVolume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
+	if [ "${SourceBuild}" != "${ProductBuildVersion}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
+	while [ -e "${LibraryFolder}/${ImageName}.dmg" ] ; do
+		printf "An image already exists named \033[1m${ImageName}.dmg\033[m.\n"
+		read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty ; echo
+		if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
+		case "${Overwrite}" in
+			"Y" | "y" ) echo ; rm -f "${LibraryFolder}/${ImageName}.dmg" ; break ;;
+			"N" | "n" ) echo ; break ;;
+		esac
+	done
+	Overwrite=""
+	if [ ! -e "${LibraryFolder}/${ImageName}.dmg" ] ; then
+		Removables=(
+			".Spotlight-V100"
+			".Trashes"
+			".fseventsd"
+		)
+		if [ ! -e "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; chown 99:99 "${LibraryFolder}" ; fi
+		if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
+			hdiutil create -size "${ImageSize}g" -type SPARSE -fs HFS+J -volname "${VolumeName}" "/tmp/${ImageName}.sparseimage"
+			InstallTarget=`hdiutil attach -owners on -noverify "/tmp/${ImageName}.sparseimage" | grep "/Volumes/${VolumeName}" | awk -F "/Volumes/" '{print $NF}'`
+			chown 0:80 "/Volumes/${InstallTarget}"
+			chmod 1775 "/Volumes/${InstallTarget}"
+			if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] ; then
+				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${InstallTarget}"
+			else
+				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${InstallTarget}"
+			fi
+			bless --folder "/Volumes/${InstallTarget}/System/Library/CoreServices" --bootefi 2>/dev/null
+			touch "/Volumes/${InstallTarget}/private/var/db/.RunLanguageChooserToo"
+			for Removable in "${Removables[@]}" ; do
+				if [ -e "/Volumes/${InstallTarget}/${Removable}" ] ; then rm -rf "/Volumes/${InstallTarget}/${Removable}" ; fi
+			done
+			Device=`diskutil info "/Volumes/${InstallTarget}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			diskutil unmountDisk force "/dev/${Device}" &>/dev/null
+			printf "Unmount of all volumes on ${Device} was successful\n"
+			diskutil eject "/dev/${Device}" &>/dev/null
+			printf "Disk /dev/${Device} ejected\n"
+			hdiutil convert -format UDZO "/tmp/${ImageName}.sparseimage" -o "${LibraryFolder}/${ImageName}.dmg"
+			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
+			echo
+			press_anyKey
+		else
+			for Removable in "${Removables[@]}" ; do
+				if [ -e "/Volumes/${SourceVolume}/${Removable}" ] ; then rm -rf "/Volumes/${SourceVolume}/${Removable}" ; fi
+			done
+			Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			DeviceNodes=`diskutil list "/dev/${Device}" | grep -c "Apple_HFS"`
+			if [ ${DeviceNodes} -gt 1 ] ; then
+				Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Device Node:" | awk -F "/dev/" '{print $NF}'`
+				diskutil unmount force "/dev/${Device}" &>/dev/null
+				printf "Volume ${SourceVolume} on ${Device} unmounted\n"
+			else
+				diskutil unmountDisk force "/dev/${Device}" &>/dev/null
+				printf "Unmount of all volumes on ${Device} was successful\n"
+			fi
+			hdiutil create -srcdevice "/dev/${Device}" -o "${LibraryFolder}/${ImageName}.dmg"
+			diskutil mountDisk "/dev/${Device}"
+			echo
+			press_anyKey
+		fi
+	fi
+}
+
+function display_Images {
+	printf "Images:		${Images[0]}\n"
+	i=0 ; for Image in "${Images[@]}" ; do
+		if [ ${i} -ne 0 ] ; then printf "		${Image}\n" ; fi
+		let i++
+	done
+	printf "\n"
+}
+
+function menu_CreateImage {
+	CreateOptions=( "Main Menu" "Select Source" "Create Image" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		get_Images
+		display_Subtitle "Create Image"
+		display_Source
+		display_Images
+		display_Options "Options" "Select an option: "
+		select Option in "${CreateOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Select Source" ) select_Source ; unset Option ; break ;;
+				"Create Image" ) create_Image ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset SourceVersion
+	unset SourceBuild
+	unset SourceVolume
+	unset ImageName
+	unset Option
+}
+
 # Section: Target
 
 function get_Volumes {
+	unset Volumes[@]
 	IFS=$'\n'
 	Volumes=( `df | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
 	unset IFS
 	i=0 ; for Volume in "${Volumes[@]}" ; do
-		if [ ! -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] || [ -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] || [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then unset Volumes[i] ; fi
+		if [ ! -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] || [ -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] || [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then
+			unset Volumes[i]
+		fi
+		if [ $( diskutil info "/Volumes/${Volume}" | grep "Read-Only Volume:" | awk -F " " '{print $NF}' ) == "Yes" ] ; then
+			unset Volumes[i]
+		fi
+		let i++
+	done
+}
+
+function get_Images {
+	unset Images[@]
+	IFS=$'\n'
+	Images=( `ls "${LibraryFolder}/"*.dmg | awk -F "${LibraryFolder}/" '{print $NF}'` )
+	unset IFS
+}
+
+function get_Targets {
+	unset TargetNames
+	unset TargetTypes
+	get_Volumes
+	i=0 ; for Volume in "${Volumes[@]}" ; do
+		TargetNames[i]="${Volume}"
+		TargetTypes[i]=0
 		let i++
 	done
 	unset Volume
+	get_Images
+	for Image in "${Images[@]}" ; do
+		TargetNames[i]="${Image}"
+		TargetTypes[i]=1
+		let i++
+	done
+	unset Image
 }
 
 function set_Target {
@@ -170,6 +854,72 @@ function set_Target {
 	else
 		unset Target
 	fi
+}
+
+function set_TargetOSVersion {
+	TargetOSMajor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $1}'`
+	TargetOSMinor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
+	TargetOSPoint=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $3}'`
+	if [ -z "${TargetOSPoint}" ] ; then TargetOSPoint=0 ; fi
+	TargetOSBuild=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductBuildVersion"`
+	case ${TargetOSMinor} in
+		6 | 7 ) PLACES="ZGEOPLACE" ;;
+		8 ) PLACES="ZGEOKITPLACE" ;;
+	esac
+}
+
+function set_TargetProperties {
+	# ${1}: Volume
+	set_Target "${1}"
+	set_TargetOSVersion
+	refresh_Language
+	refresh_Country
+	refresh_Keyboard
+	refresh_GeonameID
+}
+
+function display_Target {
+	printf "Target:			"
+	if [ -n "${TargetName}" ] ; then printf "${TargetName}" ; else printf "-" ; fi
+	printf "\n"
+	printf "System:			"
+	if [ -n "${TargetOSBuild}" ] ; then
+		printf "Mac OS X ${TargetOSMajor}.${TargetOSMinor}"
+		if [ ${TargetOSPoint} -ne 0 ] ; then printf ".${TargetOSPoint}" ; fi
+		printf " (${TargetOSBuild})"
+	else
+		printf "-"
+	fi
+	printf "\n\n"
+}
+
+function select_Target {
+	if [ -n "${Target}" ] ; then
+		if [ ${TargetType} -eq 1 ] ; then hdiutil eject "${Target}" ; fi
+	fi
+	get_Targets
+	unset TargetName
+	unset TargetType
+	display_Subtitle "Select Target"
+	display_Target
+	if [ ${#TargetNames[@]} -eq 0 ] ; then
+		press_anyKey "No targets available, please create an image, or attach an un-booted system volume."
+	else
+		display_Options "Available Targets" "Select a target: "
+		select TargetName in "${TargetNames[@]}" ; do
+			if [ -n "${TargetName}" ] ; then break ; fi
+		done
+	fi
+	i=0 ; for Element in "${TargetNames[@]}" ; do
+		if [ "${TargetName}" == "${Element}" ] ; then TargetType="${TargetTypes[i]}" ; break ; fi
+		let i++
+	done
+	if [ ${TargetType} -eq 0 ] ; then
+		Volume="${TargetName}"
+	else
+		Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'`
+	fi
+	set_TargetProperties "${Volume}"
 }
 
 # Section: Language
@@ -3835,40 +4585,6 @@ function save_RemoteManagement {
 
 # Section: Runtime
 
-function display_Target {
-	printf "Target:			"
-	if [ -n "${Target}" ] ; then printf "${Target}" ; else printf "-" ; fi
-	printf "\n"
-	printf "System:			"
-	if [ -n "${TargetOSBuild}" ] ; then
-		printf "Mac OS X ${TargetOSMajor}.${TargetOSMinor}"
-		if [ ${TargetOSPoint} -ne 0 ] ; then printf ".${TargetOSPoint}" ; fi
-		printf " (${TargetOSBuild})"
-	else
-		printf "-"
-	fi
-	printf "\n\n"
-}
-
-function select_Target {
-	display_Subtitle "Select Target Volume"
-	if [ ${#Volumes[@]} -gt 0 ] ; then
-		Volumes=( "None" "${Volumes[@]}" )
-		display_Target
-		display_Options "Available Volumes" "Select a target: "
-		select Volume in "${Volumes[@]}" ; do
-			if [ -n "${Volume}" ] ; then break ; fi
-		done
-		if [ "${Volume}" == "None" ] ; then unset Volume ; fi
-	fi
-	set_Target "${Volume}"
-	set_TargetOSVersion
-	refresh_Language
-	refresh_Country
-	refresh_Keyboard
-	refresh_GeonameID
-}
-
 function display_Language {
 	printf "Language:		"
 	if [ -n "${Language}" ] ; then printf "${Language}" ; else printf "-" ; fi
@@ -4620,669 +5336,6 @@ function display_Output {
 	press_anyKey
 }
 
-function check_Path {
-	# ${1}:	Path to validate
-	validPath=0
-	# Check for invalid characters
-	escapedPath="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
-	if [ "${1}" != "${escapedPath}" ] ; then
-		printf "\nThe specified path cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validPath=1 ; return 1
-	fi
-	# Check that it's absolute
-	relativePath=`echo "${1}" | awk -F "/" '{print $1}'`
-	if [ -n "${relativePath}" ] ; then
-		printf "\nThe specified path must be absolute, please enter an absolute path\n" ; validPath=1 ; return 1
-	fi
-	# Check the volume exists
-	if echo "${1}" | grep -q "/Volumes/" ; then
-		volumeName=`echo "${1}" | awk -F "/Volumes/" '{print $NF}' | awk -F "/" '{print $1}'`
-		if [ ! -d "/Volumes/${volumeName}" ] ; then
-			printf "\nThe specified volume cannot be found, please enter a valid path\n" ; validPath=1 ; return 1
-		fi
-	fi
-	# Check that the path is not a file
-	if [ -f "${1}" ] ; then
-		printf "\nThe specified path is to a file, please enter a path to a folder\n" ; validPath=1 ; return 1
-	fi
-	# Check that the path is unique
-	if [ "${1}" == "${ConfigurationFolder}" ] || [ "${1}" == "${LibraryFolder}" ] || [ "${1}" == "${PackageFolder}" ] || [ "${1}" == "${MasterFolder}" ] ; then
-		printf "\nThe folders must be unique, please enter a different path\n" ; validPath=1 ; return 1
-	fi
-	return 0
-}
-
-function get_ConfigurationFolder {
-	prefConfigurationFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" 2>/dev/null`
-	if [ -n "${prefConfigurationFolder}" ] ; then
-		if [ -d "${prefConfigurationFolder}" ] ; then
-			ConfigurationFolder="${prefConfigurationFolder}"
-		else
-			printf "Warning:		Configurations Folder missing, reverting to default\n"
-		fi
-	fi
-}
-
-function set_ConfigurationFolder {
-	display_Subtitle "Default Folders"
-	printf "Configurations Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
-	if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
-	check_Path "${newConfigurationFolder}"
-	while [ ${validPath} -ne 0 ] ; do
-		printf "\nConfiguration Folder (${ConfigurationFolder}): " ; read newConfigurationFolder
-		if [ -z "${newConfigurationFolder}" ] || [ "${newConfigurationFolder}" == "${ConfigurationFolder}" ] ; then return 0 ; fi
-		check_Path "${newConfigurationFolder}"
-	done
-	ConfigurationFolder="${newConfigurationFolder}"
-}
-
-function get_LibraryFolder {
-	prefLibraryFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" 2>/dev/null`
-	if [ -n "${prefLibraryFolder}" ] ; then
-		if [ -d "${prefLibraryFolder}" ] ; then
-			LibraryFolder="${prefLibraryFolder}"
-		else
-			printf "Warning:		Library Folder missing, reverting to default\n"
-		fi
-	fi
-}
-
-function set_LibraryFolder {
-	display_Subtitle "Default Folders"
-	printf "Library Folder (${LibraryFolder}): " ; read newLibraryFolder
-	if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
-	check_Path "${newLibraryFolder}"
-	while [ ${validPath} -ne 0 ] ; do
-		printf "\nLibrary Folder (${LibraryFolder}): " ; read newLibraryFolder
-		if [ -z "${newLibraryFolder}" ] || [ "${newLibraryFolder}" == "${LibraryFolder}" ] ; then return 0 ; fi
-		check_Path "${newLibraryFolder}"
-	done
-	LibraryFolder="${newLibraryFolder}"
-}
-
-function get_PackageFolder {
-	prefPackageFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" 2>/dev/null`
-	if [ -n "${prefPackageFolder}" ] ; then
-		if [ -d "${prefPackageFolder}" ] ; then
-			PackageFolder="${prefPackageFolder}"
-		else
-			printf "Warning:		Packages Folder missing, reverting to default\n"
-		fi
-	fi
-}
-
-function set_PackageFolder {
-	display_Subtitle "Default Folders"
-	printf "Packages Folder (${PackageFolder}): " ; read newPackageFolder
-	if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
-	check_Path "${newPackageFolder}"
-	while [ ${validPath} -ne 0 ] ; do
-		printf "\nPackage Folder (${PackageFolder}): " ; read newPackageFolder
-		if [ -z "${newPackageFolder}" ] || [ "${newPackageFolder}" == "${PackageFolder}" ] ; then return 0 ; fi
-		check_Path "${newPackageFolder}"
-	done
-	PackageFolder="${newPackageFolder}"
-}
-
-function get_MasterFolder {
-	prefMasterFolder=`defaults read ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" 2>/dev/null`
-	if [ -n "${prefMasterFolder}" ] ; then
-		if [ -d "${prefMasterFolder}" ] ; then
-			MasterFolder="${prefMasterFolder}"
-		else
-			printf "Warning:		Masters Folder missing, reverting to default\n"
-		fi
-	fi
-}
-
-function set_MasterFolder {
-	display_Subtitle "Default Folders"
-	printf "Masters Folder (${MasterFolder}): " ; read newMasterFolder
-	if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
-	check_Path "${newMasterFolder}"
-	while [ ${validPath} -ne 0 ] ; do
-		printf "\nMaster Folder (${MasterFolder}): " ; read newMasterFolder
-		if [ -z "${newMasterFolder}" ] || [ "${newMasterFolder}" == "${MasterFolder}" ] ; then return 0 ; fi
-		check_Path "${newMasterFolder}"
-	done
-	MasterFolder="${newMasterFolder}"
-}
-
-function display_DefaultFolders {
-	printf "Configurations:		${ConfigurationFolder}\n"
-	printf "Library:		${LibraryFolder}\n"
-	printf "Packages:		${PackageFolder}\n"
-	printf "Masters:		${MasterFolder}\n"
-	printf "\n"
-}
-
-function save_DefaultFolders {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "ConfigurationFolder" -string "${ConfigurationFolder}"
-	if [ ! -d "${ConfigurationFolder}" ] ; then mkdir -p "${ConfigurationFolder}" ; fi
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "LibraryFolder" -string "${LibraryFolder}"
-	if [ ! -d "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; fi
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "PackageFolder" -string "${PackageFolder}"
-	if [ ! -d "${PackageFolder}" ] ; then mkdir -p "${PackageFolder}" ; fi
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "MasterFolder" -string "${MasterFolder}"
-	if [ ! -d "${MasterFolder}" ] ; then mkdir -p "${MasterFolder}" ; fi
-}
-
-function menu_DefaultFolders {
-	FolderOptions=( "Preferences Menu" "Configurations" "Library" "Packages" "Masters" )
-	while [ "${Option}" != "Preferences Menu" ] ; do
-		display_Subtitle "Default Folders"
-		display_DefaultFolders
-		display_Options "Options" "Select an option: "
-		select Option in "${FolderOptions[@]}" ; do
-			case "${Option}" in
-				"Preferences Menu" ) break ;;
-				"Configurations" ) set_ConfigurationFolder ; unset Option ; break ;;
-				"Library" ) set_LibraryFolder ; unset Option ; break ;;
-				"Packages" ) set_PackageFolder ; unset Option ; break ;;
-				"Masters" ) set_MasterFolder ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-	unset SaveDefaults
-	while [ -z "${SaveDefaults}" ] ; do
-		echo
-		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
-		echo
-		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
-		case "${SaveDefaults}" in
-			"Y" | "y" ) save_DefaultFolders ; echo ;;
-			"N" | "n" ) echo ;;
-			* ) echo ; unset SaveDefaults ;;
-		esac
-	done
-	unset SaveDefaults
-}
-
-function get_ImageSize {
-	prefImageSize=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ImageSize" 2>/dev/null`
-	if [ -n "${prefImageSize}" ] ; then ImageSize="${prefImageSize}" ; fi
-}
-
-function check_Size {
-	# ${1}:	Size to validate
-	validSize=0
-	# Remove invalid characters
-	newImageSize="${1//[^0-9.]/}"
-	# Validate the clean string to ensure its numeric
-	isValid=$( echo "scale=0; ${newImageSize}/${newImageSize} + 1" | bc -l 2>/dev/null )
-	if [ ${isValid} -gt 1 ] ; then
-		# Check that it's larger than 5 GB
-		if [ $( echo "${newImageSize} < ${minImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nMac OS X requires at least \033[1m${minImageSize}\033[m GB of free space to install.\n" ; ImageSize="${minImageSize}" ; validSize=1 ; return 1 ; fi
-		# Check that it's smaller than 2 TB
-		if [ $( echo "${newImageSize} > ${maxImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nThe maximum image size is \033[1m${maxImageSize}\033[m GB.\n" ; ImageSize="${maxImageSize}" ; validSize=1 ; return 1 ; fi
-		return 0
-	else
-		printf "\n\033[1m${1}\033[m is not a valid value, please enter a numeric value.\n" ; validSize=1 ; return 1
-	fi
-}
-
-function set_ImageSize {
-	display_Subtitle "Image Settings"
-	printf "Image Size (${ImageSize}): " ; read newImageSize
-	if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
-	check_Size "${newImageSize}"
-	while [ ${validSize} -ne 0 ] ; do
-		printf "\nImage Size (${ImageSize} GB): " ; read newImageSize
-		if [ -z "${newImageSize}" ] || [ "${newImageSize}" == "${ImageSize}" ] ; then return 0 ; fi
-		check_Size "${newImageSize}"
-	done
-	ImageSize="${newImageSize}"
-}
-
-function get_VolumeName {
-	prefVolumeName=`defaults read ~/Library/Preferences/au.com.mondada.SIC "VolumeName" 2>/dev/null`
-	if [ -n "${prefVolumeName}" ] ; then VolumeName="${prefVolumeName}" ; fi
-}
-
-function check_VolumeName {
-	# ${1}:	Volume Name to validate
-	validName=0
-	# Check for invalid characters
-	escapedName="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
-	if [ "${1}" != "${escapedName}" ] ; then printf "\nThe volume name cannot contain the following characters: \033[1m\$()[]\`~?*#\!|'\"\033[m\n" ; validName=1 ; return 1 ; fi
-	return 0
-}
-
-function set_VolumeName {
-	display_Subtitle "Image Settings"
-	printf "Volume Name (${VolumeName}): " ; read newVolumeName
-	if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
-	newVolumeName="${newVolumeName//\//:}"
-	check_VolumeName "${newVolumeName}"
-	while [ ${validName} -ne 0 ] ; do
-		printf "Volume Name (${VolumeName}): " ; read newVolumeName
-		if [ -z "${newVolumeName}" ] || [ "${newVolumeName}" == "${VolumeName}" ] ; then return 0 ; fi
-		newVolumeName="${newVolumeName//\//:}"
-		check_VolumeName "${newVolumeName}"
-	done
-	VolumeName="${newVolumeName}"
-}
-
-function display_ImageSettings {
-	printf "Image Size:	${ImageSize} GB\n"
-	printf "Volume Name:	${VolumeName}\n"
-	printf "\n"
-}
-
-function save_ImageSettings {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "ImageSize" -float "${ImageSize}"
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "VolumeName" -string "${VolumeName}"
-}
-
-function menu_ImageSettings {
-	ImageOptions=( "Preferences Menu" "Image Size" "Volume Name" )
-	while [ "${Option}" != "Preferences Menu" ] ; do
-		display_Subtitle "Image Settings"
-		display_ImageSettings
-		display_Options "Options" "Select an option: "
-		select Option in "${ImageOptions[@]}" ; do
-			case "${Option}" in
-				"Preferences Menu" ) break ;;
-				"Image Size" ) set_ImageSize ; unset Option ; break ;;
-				"Volume Name" ) set_VolumeName ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-	unset SaveDefaults
-	while [ -z "${SaveDefaults}" ] ; do
-		echo
-		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
-		echo
-		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
-		case "${SaveDefaults}" in
-			"Y" | "y" ) save_ImageSettings ; echo ;;
-			"N" | "n" ) echo ;;
-			* ) echo ; unset SaveDefaults ;;
-		esac
-	done
-	unset SaveDefaults
-}
-
-function get_ExportType {
-	prefExportType=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ExportType" 2>/dev/null`
-	if [ -n "${prefExportType}" ] ; then ExportType="${prefExportType}" ; fi
-}
-
-function display_RecoveryPartition {
-	printf "	["
-	if [ ${ExportType} -eq 1 ] ; then printf "*" ; else printf " " ; fi
-	printf "] Include Recovery Partition in Master\n"
-	printf "	["
-	if [ ${ExportType} -eq 2 ] ; then printf "*" ; else printf " " ; fi
-	printf "] Remove Recovery Partition from Master\n"
-	printf "	["
-	if [ ${ExportType} -eq 3 ] ; then printf "*" ; else printf " " ; fi
-	printf "] Create separate image for Recovery Partition\n"
-	printf "\n"
-}
-
-function set_RecoveryPartition {
-	RecoveryOptions=( "Include Recovery Partition in Master" "Remove Recovery Partition from Master" "Create separate image for Recovery Partition" )
-	display_Subtitle "Export Settings"
-	display_RecoveryPartition
-	display_Options "Options" "Select an option: "
-	select Option in "${RecoveryOptions[@]}" ; do
-		case "${Option}" in
-			"Include Recovery Partition in Master" ) ExportType=1 ; break ;;
-			"Remove Recovery Partition from Master" ) ExportType=2 ; break ;;
-			"Create separate image for Recovery Partition" ) ExportType=3 ; break ;;
-		esac
-	done
-	unset Option
-}
-
-function get_ScanImage {
-	prefScanImage=`defaults read ~/Library/Preferences/au.com.mondada.SIC "ScanImage" 2>/dev/null`
-	if [ -n "${prefScanImage}" ] ; then ScanImage="${prefScanImage}" ; fi
-}
-
-function display_ScanImage {
-	printf "	["
-	if [ ${ScanImage} -eq 1 ] ; then printf "*" ; else printf " " ; fi
-	printf "] Scan masters for restore\n"
-	printf "\n"
-}
-
-function set_ScanImage {
-	display_Subtitle "Export Settings"
-	display_ScanImage
-	while [ -z "${ASR}" ] ; do
-		read -sn 1 -p "Scan masters for restore (Y/n)? " ASR < /dev/tty
-		if [ -z "${ASR}" ] ; then ASR="y" ; fi
-		case "${ASR}" in
-			"Y" | "y" ) echo ; ScanImage=1 ;;
-			"N" | "n" ) echo ; ScanImage=0 ;;
-			* ) echo ; unset ASR ;;
-		esac
-	done
-	unset ASR
-}
-
-function display_ExportSettings {
-	display_RecoveryPartition
-	display_ScanImage
-}
-
-function save_ExportSettings {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "ExportType" -int ${ExportType}
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "ScanImage" -int ${ScanImage}
-}
-
-function menu_ExportSettings {
-	ExportOptions=( "Preferences Menu" "Recovery Partition" "Scan for Restore" )
-	while [ "${Option}" != "Preferences Menu" ] ; do
-		display_Subtitle "Export Settings"
-		display_ExportSettings
-		display_Options "Options" "Select an option: "
-		select Option in "${ExportOptions[@]}" ; do
-			case "${Option}" in
-				"Preferences Menu" ) break ;;
-				"Recovery Partition" ) set_RecoveryPartition ; unset Option ; break ;;
-				"Scan for Restore" ) set_ScanImage ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-	unset SaveDefaults
-	while [ -z "${SaveDefaults}" ] ; do
-		echo
-		read -sn 1 -p "Save as default settings (Y/n)? " SaveDefaults < /dev/tty
-		echo
-		if [ -z "${SaveDefaults}" ] ; then SaveDefaults="y" ; fi
-		case "${SaveDefaults}" in
-			"Y" | "y" ) save_ExportSettings ; echo ;;
-			"N" | "n" ) echo ;;
-			* ) echo ; unset SaveDefaults ;;
-		esac
-	done
-	unset SaveDefaults
-}
-
-function menu_Preferences {
-	PrefOptions=( "Main Menu" "Default Folders" "Image Settings" "Export Settings" )
-	while [ "${Option}" != "Main Menu" ] ; do
-		display_Subtitle "Preferences"
-		display_Options "Options" "Select an option: "
-		select Option in "${PrefOptions[@]}" ; do
-			case "${Option}" in
-				"Main Menu" ) break ;;
-				"Default Folders" ) menu_DefaultFolders ; unset Option ; break ;;
-				"Image Settings" ) menu_ImageSettings ; unset Option ; break ;;
-				"Export Settings" ) menu_ExportSettings ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-}
-
-function detect_Sources {
-	unset SourceVersions[@]
-	unset SourceBuilds[@]
-	unset SourceVolumes[@]
-	unset ImageNames[@]
-	IFS=$'\n'
-	Volumes=( `df | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
-	unset IFS
-	for Volume in "${Volumes[@]}" ; do
-		if [ ! -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] && [ -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] ; then
-			SourceOSMinor=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $2}'`
-			SourceOSPoint=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion | awk -F "." '{print $3}'`
-			if [ -z "${SourceOSPoint}" ] ; then SourceOSPoint=0 ; fi
-			case ${SourceOSMinor} in
-				5 ) OSname="leopard" ;;
-				6 ) OSname="snowleopard" ;;
-				7 ) OSname="lion" ;;
-				8 ) OSname="mountainlion" ;;
-			esac
-			if [ -e "/Volumes/${Volume}/System/Library/CoreServices/ServerVersion.plist" ] || [ -e "/Volumes/${Volume}/Applications/Server.app" ] || [ -e "/Volumes/${Volume}/Packages/Server.pkg" ] ; then
-				ProductName="Mac OS X Server"
-				ProductType="server"
-			else
-				ProductName="Mac OS X"
-				ProductType="user"
-			fi
-			ProductVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductVersion`
-			ProductBuildVersion=`defaults read "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
-			if [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then
-				if [ ${SourceOSMinor} -eq ${SystemOSMinor} ] ; then
-					if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] ; then
-						if [ ${SourceOSPoint} -gt 3 ] ; then
-							SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
-							SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
-							SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-							ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
-						fi
-					else
-						SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion}) Installer" )
-						SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
-						SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-						ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
-					fi
-				fi
-			else
-				SourceVersions=( "${SourceVersions[@]}" "${ProductName} ${ProductVersion} (${ProductBuildVersion})" )
-				SourceBuilds=( "${SourceBuilds[@]}" "${ProductBuildVersion}" )
-				SourceVolumes=( "${SourceVolumes[@]}" "${Volume}" )
-				ImageNames=( "${ImageNames[@]}" `echo "${OSname}_${ProductBuildVersion}_${ProductType}" | awk {'print tolower()'}` )
-			fi
-		fi
-	done
-}
-
-function display_Source {
-	printf "Source:		"
-	if [ -n "${SourceVersion}" ] ; then printf "${SourceVersion}" ; else printf "-" ; fi
-	printf "\nImage Name:	"
-	if [ -n "${ImageName}" ] ; then printf "${ImageName}.dmg" ; else printf "-" ; fi
-	printf "\n"
-	printf "\n"
-}
-
-function select_Source {
-	detect_Sources
-	display_Subtitle "Select Source"
-	if [ ${#SourceVersions[@]} -eq 0 ] ; then
-		unset SourceVersion
-		unset SourceBuild
-		unset SourceVolume
-		unset ImageName
-		press_anyKey "No sources available, please insert or mount an OS X Installer, or attach or mount an un-booted system volume."
-	else
-		display_Source
-		display_Options "Sources" "Select a source: "
-		select SourceVersion in "${SourceVersions[@]}" ; do
-			if [ -n "${SourceVersion}" ] ; then break ; fi
-		done
-		i=0 ; for Element in "${SourceVersions[@]}" ; do
-			if [ "${Element}" == "${SourceVersion}" ] ; then
-				SourceVolume="${SourceVolumes[i]}"
-				SourceBuild="${SourceBuilds[i]}"
-				ImageName="${ImageNames[i]}"
-				break
-			fi
-			let i++
-		done
-	fi
-}
-
-function install_Package {
-	# ${1}: Path to package
-	# ${2}: Installation volume
-	unset allowUntrusted
-	if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] || [ ${SystemOSMinor} -gt 7 ] ; then allowUntrusted="-allowUntrusted" ; fi
-	if [ -e "${1}" ] ; then
-		if [ "${1}" == "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-			InstallType=0
-		else
-			while [ -z "${Customize}" ] ; do
-				echo
-				read -sn 1 -p "Customize Installation (y/N)? " Customize < /dev/tty
-				if [ -z "${Customize}" ] ; then Customize="n" ; fi ; echo
-				case "${Customize}" in
-					"Y" | "y" ) InstallType=1 ; break ;;
-					"N" | "n" ) InstallType=0 ; break ;;
-					* ) Customize="" ;;
-				esac
-				echo
-			done
-		fi
-		Customize=""
-		IFS=$'\n'
-		PackageTitles=( `installer -pkginfo -pkg "${1}"` )
-		unset IFS
-		s=1
-		if [ ${InstallType} -eq 1 ] ; then
-			printf "\ninstaller: Package name is ${PackageTitles[0]}\n"
-			open "${1}"
-			printf "installer:PHASE:Waiting for installation to complete…\n"
-			while [ `ps eax | grep -i "Installer.app" | grep -v "grep" | awk '{print $1}'` ] ; do
-				printf "\b${spin:s++%${#spin}:1}"
-			done
-			printf "\binstaller: The install is complete.\n"
-		else
-			unset Previous
-			unset InstallerStatus
-			unset InstallerProgress
-			installer -verboseR "${allowUntrusted}" -pkg "${1}" -target "/Volumes/${2}" 2>/dev/null | while read Line ; do
-				if echo "${Line}" | grep -q "installer: " ; then printf "${Line}\n" ; fi
-				if echo "${Line}" | grep -q "\(installer:PHASE:\|installer:STATUS:\)" ; then
-					if [ "${InstallerStatus}" != "${Line}" ] ; then
-						InstallerStatus="${Line}"
-						if echo "${Previous}" | grep -q "installer:%" ; then
-							printf "\n${InstallerStatus}\n"
-						else
-							printf "${InstallerStatus}\n"
-						fi
-					fi
-				fi
-				if echo "${Line}" | grep -q "installer:%" ; then
-					if [ "${InstallerProgress}" != "${Line}" ] ; then
-						InstallerProgress="${Line//%/%%}"
-						printf "\r${InstallerProgress}"
-					fi
-				fi
-				Previous="${Line}"
-			done
-			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-				press_anyKey
-			fi
-		fi
-	else
-		press_anyKey "The package selection is invalid, please review your settings."
-	fi
-}
-
-function create_Image {
-	display_Subtitle "Create Image"
-	display_Source
-	if [ -z "${SourceVersion}" ] ; then press_anyKey "No source selected, please select a source first." ; return 1 ; fi
-	if [ ! -e "/Volumes/${SourceVolume}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
-	ProductBuildVersion=`defaults read "/Volumes/${SourceVolume}/System/Library/CoreServices/SystemVersion" ProductBuildVersion`
-	if [ "${SourceBuild}" != "${ProductBuildVersion}" ] ; then press_anyKey "The source volume is no longer available, please re-select the source." ; return 1 ; fi
-	while [ -e "${LibraryFolder}/${ImageName}.dmg" ] ; do
-		printf "An image already exists named \033[1m${ImageName}.dmg\033[m.\n"
-		read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty ; echo
-		if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
-		case "${Overwrite}" in
-			"Y" | "y" ) echo ; rm -f "${LibraryFolder}/${ImageName}.dmg" ; break ;;
-			"N" | "n" ) echo ; break ;;
-		esac
-	done
-	Overwrite=""
-	if [ ! -e "${LibraryFolder}/${ImageName}.dmg" ] ; then
-		Removables=(
-			".Spotlight-V100"
-			".Trashes"
-			".fseventsd"
-		)
-		if [ ! -e "${LibraryFolder}" ] ; then mkdir -p "${LibraryFolder}" ; chown 99:99 "${LibraryFolder}" ; fi
-		if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
-			hdiutil create -size "${ImageSize}g" -type SPARSE -fs HFS+J -volname "${VolumeName}" "/tmp/${ImageName}.sparseimage"
-			InstallTarget=`hdiutil attach -owners on -noverify "/tmp/${ImageName}.sparseimage" | grep "/Volumes/${VolumeName}" | awk -F "/Volumes/" '{print $NF}'`
-			chown 0:80 "/Volumes/${InstallTarget}"
-			chmod 1775 "/Volumes/${InstallTarget}"
-			if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] ; then
-				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${InstallTarget}"
-			else
-				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${InstallTarget}"
-			fi
-			bless --folder "/Volumes/${InstallTarget}/System/Library/CoreServices" --bootefi 2>/dev/null
-			touch "/Volumes/${InstallTarget}/private/var/db/.RunLanguageChooserToo"
-			for Removable in "${Removables[@]}" ; do
-				if [ -e "/Volumes/${InstallTarget}/${Removable}" ] ; then rm -rf "/Volumes/${InstallTarget}/${Removable}" ; fi
-			done
-			Device=`diskutil info "/Volumes/${InstallTarget}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
-			diskutil unmountDisk force "/dev/${Device}" &>/dev/null
-			printf "Unmount of all volumes on ${Device} was successful\n"
-			diskutil eject "/dev/${Device}" &>/dev/null
-			printf "Disk /dev/${Device} ejected\n"
-			hdiutil convert -format UDZO "/tmp/${ImageName}.sparseimage" -o "${LibraryFolder}/${ImageName}.dmg"
-			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
-			echo
-			press_anyKey
-		else
-			for Removable in "${Removables[@]}" ; do
-				if [ -e "/Volumes/${SourceVolume}/${Removable}" ] ; then rm -rf "/Volumes/${SourceVolume}/${Removable}" ; fi
-			done
-			Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
-			DeviceNodes=`diskutil list "/dev/${Device}" | grep -c "Apple_HFS"`
-			if [ ${DeviceNodes} -gt 1 ] ; then
-				Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Device Node:" | awk -F "/dev/" '{print $NF}'`
-				diskutil unmount force "/dev/${Device}" &>/dev/null
-				printf "Volume ${SourceVolume} on ${Device} unmounted\n"
-			else
-				diskutil unmountDisk force "/dev/${Device}" &>/dev/null
-				printf "Unmount of all volumes on ${Device} was successful\n"
-			fi
-			hdiutil create -srcdevice "/dev/${Device}" -o "${LibraryFolder}/${ImageName}.dmg"
-			diskutil mountDisk "/dev/${Device}"
-			echo
-			press_anyKey
-		fi
-	fi
-}
-
-function display_LibraryImages {
-	IFS=$'\n'
-	LibraryImages=( `ls "${LibraryFolder}" | grep "\.dmg"` )
-	unset IFS
-	printf "Library Images:	${LibraryImages[0]}\n"
-	i=0 ; for Image in "${LibraryImages[@]}" ; do
-		if [ ${i} -ne 0 ] ; then printf "		${Image}\n" ; fi
-		let i++
-	done
-	printf "\n"
-}
-
-function menu_CreateImage {
-	CreateOptions=( "Main Menu" "Select Source" "Create Image" )
-	while [ "${Option}" != "Main Menu" ] ; do
-		display_Subtitle "Create Image"
-		display_Source
-		display_LibraryImages
-		display_Options "Options" "Select an option: "
-		select Option in "${CreateOptions[@]}" ; do
-			case "${Option}" in
-				"Main Menu" ) break ;;
-				"Select Source" ) select_Source ; unset Option ; break ;;
-				"Create Image" ) create_Image ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset SourceVersion
-	unset SourceBuild
-	unset SourceVolume
-	unset ImageName
-	unset Option
-}
-
 function load_Configuration {
 	display_Subtitle "Function not Implemented"
 	sleep 2
@@ -5397,19 +5450,20 @@ function apply_Configuration {
 }
 
 function menu_Configure {
-	ConfigureOptions=( "Main Menu" "Load Configuration" "Save Configuration" "Select Target" "System Settings" "User Accounts" "Install Packages" "Apply Configuration" )
+	ConfigureOptions=( "Main Menu" "Select Target" "System Settings" "User Accounts" "Select Packages" "Load Configuration" "Save Configuration" "Apply Configuration" )
 	while [ "${Option}" != "Main Menu" ] ; do
 		display_Subtitle "Configure System"
+		display_Target
 		display_Options "Options" "Select an option: "
 		select Option in "${ConfigureOptions[@]}" ; do
 			case "${Option}" in
 				"Main Menu" ) break ;;
-				"Load Configuration" ) load_Configuration ; unset Option ; break ;;
-				"Save Configuration" ) save_Configuration ; unset Option ; break ;;
 				"Select Target" ) select_Target ; unset Option ; break ;;
 				"System Settings" ) menu_SystemSettings ; unset Option ; break ;;
 				"User Accounts" ) menu_UserAccounts ; unset Option ; break ;;
-				"Install Packages" ) menu_Packages ; unset Option ; break ;;
+				"Select Packages" ) menu_Packages ; unset Option ; break ;;
+				"Load Configuration" ) load_Configuration ; unset Option ; break ;;
+				"Save Configuration" ) save_Configuration ; unset Option ; break ;;
 				"Apply Configuration" ) apply_Configuration ; unset Option ; break ;;
 			esac
 		done
@@ -5436,7 +5490,7 @@ function main_Menu {
 privelege_Check
 get_LicenseStatus
 menu_License
-set_SystemOSVersion
+get_SystemOSVersion
 get_ConfigurationFolder
 get_LibraryFolder
 get_PackageFolder
