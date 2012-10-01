@@ -829,22 +829,20 @@ function get_Images {
 }
 
 function get_Targets {
-	unset TargetNames
-	unset TargetTypes
+	TargetNames=( "None" )
+	TargetTypes=( 0 )
 	get_Volumes
-	i=0 ; for Volume in "${Volumes[@]}" ; do
-		TargetNames[i]="${Volume}"
-		TargetTypes[i]=0
-		let i++
-	done
-	unset Volume
-	get_Images
-	for Image in "${Images[@]}" ; do
-		TargetNames[i]="${Image}"
+	i=1 ; for Element in "${Volumes[@]}" ; do
+		TargetNames[i]="${Element}"
 		TargetTypes[i]=1
 		let i++
 	done
-	unset Image
+	get_Images
+	for Element in "${Images[@]}" ; do
+		TargetNames[i]="${Element}"
+		TargetTypes[i]=2
+		let i++
+	done
 }
 
 function set_Target {
@@ -853,6 +851,7 @@ function set_Target {
 		Target="/Volumes/${1}"
 	else
 		unset Target
+		TargetType=0
 	fi
 }
 
@@ -879,10 +878,13 @@ function set_TargetProperties {
 }
 
 function display_Target {
-	printf "Target:			"
+	printf "Target:		"
 	if [ -n "${TargetName}" ] ; then printf "${TargetName}" ; else printf "-" ; fi
 	printf "\n"
-	printf "System:			"
+	# Begin: Debug Output
+	# echo "TargetType:		${TargetType}"
+	# End: Debug Output
+	printf "System:		"
 	if [ -n "${TargetOSBuild}" ] ; then
 		printf "Mac OS X ${TargetOSMajor}.${TargetOSMinor}"
 		if [ ${TargetOSPoint} -ne 0 ] ; then printf ".${TargetOSPoint}" ; fi
@@ -894,12 +896,7 @@ function display_Target {
 }
 
 function select_Target {
-	if [ -n "${Target}" ] ; then
-		if [ ${TargetType} -eq 1 ] ; then hdiutil eject "${Target}" ; fi
-	fi
 	get_Targets
-	unset TargetName
-	unset TargetType
 	display_Subtitle "Select Target"
 	display_Target
 	if [ ${#TargetNames[@]} -eq 0 ] ; then
@@ -914,12 +911,11 @@ function select_Target {
 		if [ "${TargetName}" == "${Element}" ] ; then TargetType="${TargetTypes[i]}" ; break ; fi
 		let i++
 	done
-	if [ ${TargetType} -eq 0 ] ; then
-		Volume="${TargetName}"
-	else
-		Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'`
-	fi
+	if [ ${TargetType} -eq 0 ] ; then unset TargetName ; unset Volume ; fi
+	if [ ${TargetType} -eq 1 ] ; then Volume="${TargetName}" ; fi
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; fi
 	set_TargetProperties "${Volume}"
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 }
 
 # Section: Language
@@ -4922,7 +4918,6 @@ function save_Settings {
 }
 
 function display_SystemSettings {
-	display_Target
 	display_Language
 	display_CountryName
 	display_Keyboard
@@ -5336,17 +5331,8 @@ function display_Output {
 	press_anyKey
 }
 
-function load_Configuration {
-	display_Subtitle "Function not Implemented"
-	sleep 2
-}
-
-function save_Configuration {
-	display_Subtitle "Function not Implemented"
-	sleep 2
-}
-
 function menu_SystemSettings {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	SystemOptions=( "Configuration Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
 	while [ "${Option}" != "Configuration Menu" ] ; do
 		display_Subtitle "System Settings"
@@ -5367,10 +5353,12 @@ function menu_SystemSettings {
 			esac
 		done
 	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	unset Option
 }
 
 function menu_AddUser {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	AddUserOptions=( "User Accounts Menu" "Full Name" "Account Name" "User ID" "Password" "Automatic Login" "Password Hint" "Login shell" "Home Directory" )
 	while [ "${Option}" != "User Accounts Menu" ] ; do
 		display_Subtitle "Add User"
@@ -5389,10 +5377,12 @@ function menu_AddUser {
 			esac
 		done
 	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	unset Option
 }
 
 function menu_EditUser {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	EditUserOptions=( "User Accounts Menu" "Select User" )
 	while [ "${Option}" != "User Accounts Menu" ] ; do
 		display_Subtitle "Edit User"
@@ -5404,6 +5394,7 @@ function menu_EditUser {
 			esac
 		done
 	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	unset Option
 }
 
@@ -5440,6 +5431,16 @@ function menu_UserAccounts {
 }
 
 function menu_Packages {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
+
+function load_Configuration {
+	display_Subtitle "Function not Implemented"
+	sleep 2
+}
+
+function save_Configuration {
 	display_Subtitle "Function not Implemented"
 	sleep 2
 }
@@ -5497,8 +5498,7 @@ get_PackageFolder
 get_MasterFolder
 get_VolumeName
 get_ImageSize
-#set_Target
-set_TargetOSVersion
+set_TargetProperties
 get_Language
 set_LanguageCountryCodes "${LanguageCode}"
 set_OtherCountryCodes
