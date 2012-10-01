@@ -153,7 +153,7 @@ FirstBootPath="/usr/libexec/FirstBoot"
 scriptName=`basename "${0}"`
 
 # Version
-SICVersion="1.2rc10"
+SICVersion="1.2rc11"
 
 function display_Title {
 	# ${1}:	Title
@@ -377,8 +377,8 @@ function check_Size {
 	# Remove invalid characters
 	newImageSize="${1//[^0-9.]/}"
 	# Validate the clean string to ensure its numeric
-	isValid=$( echo "scale=2; ${newImageSize}/${newImageSize} + 1" | bc -l 2>/dev/null )
-	if [ ${isValid} > 1 ] ; then
+	isValid=$( echo "scale=0; ${newImageSize}/${newImageSize} + 1" | bc -l 2>/dev/null )
+	if [ ${isValid} -gt 1 ] ; then
 		# Check that it's larger than 5 GB
 		if [ $( echo "${newImageSize} < ${minImageSize}" | bc 2>/dev/null ) -ne 0 ] ; then printf "\nMac OS X requires at least \033[1m${minImageSize}\033[m GB of free space to install.\n" ; ImageSize="${minImageSize}" ; validSize=1 ; return 1 ; fi
 		# Check that it's smaller than 2 TB
