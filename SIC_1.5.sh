@@ -31,7 +31,7 @@ ScanImage=1
 FirstBootPath="/usr/libexec/FirstBoot"
 
 # Version
-SICVersion="1.5a1"
+SICVersion="1.5a2"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -80,6 +80,23 @@ function get_SystemOSVersion {
 	SystemOSPoint=`sw_vers -productVersion | awk -F "." '{print $3}'`
 	if [ -z "${SystemOSPoint}" ] ; then SystemOSPoint=0 ; fi
 	SystemOSBuild=`sw_vers -buildVersion`
+}
+
+function get_LocalUsers {
+	unset LocalRecordNames
+	unset LocalRealNames
+	unset LocalUniqueIDs
+	LocalUsers=( `dscl -f "/var/db/dslocal/nodes/Default" localonly -list /Local/Target/Users` )
+	i=0 ; for Element in "${LocalUsers[@]}" ; do
+		AuthenticationAuthority=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "AuthenticationAuthority" 2>/dev/null`
+		if [ "${Element}" != "root" ] && [ -n "${AuthenticationAuthority}" ] ; then
+			LocalRecordNames[i]="${Element}"
+			LocalRealNames[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "RealName" 2>/dev/null | grep -v "RealName:" | sed "s/^ *//g"`
+			LocalUniqueIDs[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "UniqueID" 2>/dev/null | awk -F "UniqueID: " '{print $NF}'`
+			LocalNFSHomeDirectories[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "NFSHomeDirectory" 2>/dev/null | awk -F "NFSHomeDirectory: " '{print $NF}'`
+		let i++
+		fi
+	done
 }
 
 # Section: License & Copyright
@@ -3816,7 +3833,9 @@ function set_UseGeoKit {
 			TimeZonePrefPane="${Target}/System/Library/PreferencePanes/DateAndTime.prefPane/Contents/Resources/TimeZone.prefPane"
 			IsPlist=`file "${TimeZonePrefPane}/Contents/Resources/English.lproj/Localizable_Cities.strings" | grep -vq "property list" ; echo ${?}`
 			i=0 ; while : ; do
-				Item0=`/usr/libexec/PlistBuddy -c "Print ':${i}:0'" "${TimeZonePrefPane}/Contents/Resources/all_cities_adj.plist" 2>/dev/null` ; if [ ${?} -ne 0 ] ; then break ; fi ; all_cities_adj_0[i]="${Item0}"
+				Item0=`/usr/libexec/PlistBuddy -c "Print ':${i}:0'" "${TimeZonePrefPane}/Contents/Resources/all_cities_adj.plist" 2>/dev/null`
+				if [ ${?} -ne 0 ] ; then break ; fi
+				all_cities_adj_0[i]="${Item0}"
 				all_cities_adj_1[i]=`/usr/libexec/PlistBuddy -c "Print ':${i}:1'" "${TimeZonePrefPane}/Contents/Resources/all_cities_adj.plist"`
 				all_cities_adj_2[i]=`/usr/libexec/PlistBuddy -c "Print ':${i}:2'" "${TimeZonePrefPane}/Contents/Resources/all_cities_adj.plist"`
 				all_cities_adj_3[i]=`/usr/libexec/PlistBuddy -c "Print ':${i}:3'" "${TimeZonePrefPane}/Contents/Resources/all_cities_adj.plist"`
@@ -4928,6 +4947,529 @@ function display_SystemSettings {
 	display_RemoteManagement
 }
 
+function menu_SystemSettings {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
+	SystemOptions=( "Configuration Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
+	while [ "${Option}" != "Configuration Menu" ] ; do
+		display_Subtitle "System Settings"
+		display_SystemSettings
+		display_Options "Options" "Select an option: "
+		select Option in "${SystemOptions[@]}" ; do
+			case "${Option}" in
+				"Configuration Menu" ) break ;;
+				"Language" ) select_Language ; unset Option ; break ;;
+				"Country" ) select_Country ; unset Option ; break ;;
+				"Keyboard" ) select_Keyboard ; unset Option ; break ;;
+				"Location Services" ) set_LocationServices ; unset Option ; break ;;
+				"Network Time Server" ) select_NTPServer ; unset Option ; break ;;
+				"Time Zone" ) select_TimeZone ; unset Option ; break ;;
+				"Remote Login" ) select_RemoteLogin ; unset Option ; break ;;
+				"Remote Management" ) select_RemoteManagement ; unset Option ; break ;;
+				"Computer Name" ) not_Implemented ; unset Option ; break ;;
+			esac
+		done
+	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
+	unset Option
+}
+
+# Section: User Accounts
+
+function check_AttributeReserved {
+	# ${1}:	Attribute
+	# ${2}: Value
+	searchResult=`dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -search /Local/Target/Users "${1}" "${2}"`
+	if [ -n "${searchResult}" ] ; then
+		case "${1}" in
+			"RecordName" ) for Element in "${LocalRecordNames[@]}" ; do if [ "${2}" == "${Element}" ] ; then return 1 ; fi ; done ;;
+			"RealName" ) for Element in "${LocalRealNames[@]}" ; do if [ "${2}" == "${Element}" ] ; then return 1 ; fi ; done ;;
+			"UniqueID" ) for Element in "${LocalUniqueIDs[@]}" ; do if [ ${2} -eq ${Element} ] ; then return 1 ; fi ; done ;;
+		esac
+		return 0
+	fi
+	return 1
+}
+
+function check_AttributeInUse {
+	# ${1}:	Attribute
+	# ${2}: Value
+	case "${1}" in
+		"RecordName" ) for Element in "${RecordNames[@]}" ; do if [ "${2}" == "${Element}" ] ; then return 0 ; fi ; done ;;
+		"RealName" ) for Element in "${RealNames[@]}" ; do if [ "${2}" == "${Element}" ] ; then return 0 ; fi ; done ;;
+		"UniqueID" ) for Element in "${UniqueIDs[@]}" ; do if [ ${2} -eq ${Element} ] ; then return 0 ; fi ; done ;;
+	esac
+	return 1
+}
+
+function update_RealName {
+	# ${1}: RealName
+	RealName="${1}"
+	i=0
+	if check_AttributeReserved "RealName" "${RealName}" ; then
+		while [ ${?} -ne 1 ] ; do
+			let i++
+			check_AttributeReserved "RealName" "${RealName}${i}"
+		done
+	fi
+	if check_AttributeInUse "RealName" "${RealName}" || check_AttributeInUse "RealName" "${RealName}${i}" ; then
+		while [ ${?} -ne 1 ] ; do
+			let i++
+			check_AttributeInUse "RealName" "${RealName}${i}"
+		done
+	fi
+	if check_AttributeReserved "RealName" "${RealName}" || check_AttributeInUse "RealName" "${RealName}" ; then
+		RealName="${RealName}${i}"
+	fi
+}
+
+function check_RealName {
+	# ${1}:	RealName
+	if check_AttributeReserved "RealName" "${1}" ; then
+		update_RealName "${1}"
+		printf "\n\033[1mThe name you entered is reserved.\033[m\nPlease enter a different name.\n"
+		return 0
+	fi
+	if check_AttributeInUse "RealName" "${1}" ; then
+		update_RealName "${1}"
+		printf "\n\033[1mThe name you entered can't be used.\033[m\nThis name is not available. Please enter a different name.\n"
+		return 0
+	fi
+	return 1
+}
+
+function update_RecordName {
+	# ${1}: RealName or RecordName
+	RecordName=`echo "${1}" | tr "[:upper:]" "[:lower:]" | tr "[=à=]" "a" | tr "[=á=]" "a" | tr "[=å=]" "a" | tr "[=ä=]" "a" | tr "[=â=]" "a" | tr "[=ã=]" "a" | tr "[=ç=]" "c" | tr "[=è=]" "e" | tr "[=é=]" "e" | tr "[=ë=]" "e" | tr "[=ê=]" "e" | tr "[=ì=]" "i" | tr "[=í=]" "i" | tr "[=ï=]" "i" | tr "[=î=]" "i" | tr "[=ñ=]" "n" | tr "[=ò=]" "o" | tr "[=ó=]" "o" | tr "[=ö=]" "o" | tr "[=ô=]" "o" | tr "[=õ=]" "o" | tr "[=ù=]" "u" | tr "[=ú=]" "u" | tr "[=ü=]" "u" | tr "[=û=]" "u" | tr "[=ÿ=]" "y"`
+	RecordName="${RecordName//[^a-zA-Z0-9_.-]/}"
+	i=0
+	if check_AttributeReserved "RecordName" "${RecordName}" ; then
+		while [ ${?} -ne 1 ] ; do
+			let i++
+			check_AttributeReserved "RecordName" "${RecordName}${i}"
+		done
+	fi
+	if check_AttributeInUse "RecordName" "${RecordName}" || check_AttributeInUse "RecordName" "${RecordName}${i}" ; then
+		while [ ${?} -ne 1 ] ; do
+			let i++
+			check_AttributeInUse "RecordName" "${RecordName}${i}"
+		done
+	fi
+	if check_AttributeReserved "RecordName" "${RecordName}" || check_AttributeInUse "RecordName" "${RecordName}" ; then
+		RecordName="${RecordName}${i}"
+	fi
+}
+
+function check_RecordName {
+	# ${1}: RecordName
+	badChars="${1//[-a-zA-Z0-9_.-]/}"
+	if [ -n "${badChars}" ] ; then
+		update_RecordName "${1}"
+		printf "\n\033[1mThe short name you entered can't be used.\033[m\nTry using a short name with fewer characters, or with no punctuation marks. Please enter a different name.\n"
+		return 0
+	fi
+	if check_AttributeReserved "RecordName" "${1}" ; then
+		update_RecordName "${1}"
+		printf "\n\033[1mThe short name you entered is reserved.\033[m\nPlease enter a different short name.\n"
+		return 0
+	fi
+	if check_AttributeInUse "RecordName" "${1}" ; then
+		update_RecordName "${1}"
+		printf "\n\033[1mThe short name you entered can't be used.\033[m\nThis short name is not available. Please enter a different name.\n"
+		return 0
+	fi
+	return 1
+}
+
+function check_Password {
+	# ${1}: Password
+	# ${2}: Verification
+	if [ "${1}" != "${2}" ] ; then
+		printf "\n\033[1mThe passwords do not match.\033[m\nPlease re-enter your password."
+		return 0
+	fi
+	return 1
+}
+
+function check_AuthenticationHint {
+	# ${1}: AuthenticationHint
+	# ${2}: Password
+	if [ "${1}" == "" ] ; then return 1 ; fi
+	if [ "${1}" == "${2}" ] ; then
+		printf "\n\033[1mThe hint and the password are the same.\033[m\nThis is a security risk. Please enter a different hint.\n"
+		return 0
+	fi
+	return 1
+}
+
+function update_UniqueID {
+	# ${1}: UniqueID
+	UniqueID="${1//[^0-9]/}"
+	if check_AttributeReserved "UniqueID" ${UniqueID} ; then
+		while [ ${?} -ne 1 ] ; do
+			let UniqueID++
+			check_AttributeReserved "UniqueID" ${UniqueID}
+		done
+	fi
+	if check_AttributeInUse "UniqueID" ${UniqueID} ; then
+		while [ ${?} -ne 1 ] ; do
+			let UniqueID++
+			check_AttributeInUse "UniqueID" ${UniqueID}
+		done
+	fi
+}
+
+function check_UniqueID {
+	# ${1}: UniqueID
+	badChars="${1//[-0-9]/}"
+	if [ -n "${badChars}" ] ; then
+		update_UniqueID ${1}
+		printf "\n\033[1mThe user id you entered can't be used.\033[m\nThe user id may only contain numeric characters. Please enter a different user id.\n"
+		return 0
+	fi
+	if check_AttributeReserved "UniqueID" "${1}" ; then
+		update_UniqueID ${1}
+		printf "\n\033[1mThe user id you entered is reserved.\033[m\nPlease enter a different user id.\n"
+		return 0
+	fi
+	if check_AttributeInUse "UniqueID" "${1}" ; then
+		update_UniqueID ${1}
+		printf "\n\033[1mThe user id you entered can't be used.\033[m\nThis user id is not available. Please enter a different user id.\n"
+		return 0
+	fi
+	return 1
+}
+
+function update_NFSHomeDirectory {
+	if [ -n "${RecordName}" ] ; then
+		if [ -z "${UniqueID}" ] || [ ${UniqueID} -gt 500 ] ; then
+			NFSHomeDirectory="/Users/${RecordName}"
+		else
+			NFSHomeDirectory="/var/${RecordName}"
+		fi
+	else
+		NFSHomeDirectory="/var/empty"
+	fi
+}
+
+function check_NFSHomeDirectory {
+	# ${1}:	NFSHomeDirectory
+	escapedPath="${1//[\$\(\)\[\]\`\~\?\*\#\\\!\|\'\"]/_}"
+	if [ "${1}" != "${escapedPath}" ] ; then
+		printf "\n\033[1mThe path \"${1}\" can't be used.\033[m\nTry using a path with no punctuation marks. Please enter a different path.\n"
+		return 0
+	fi
+	relativePath=`echo "${1}" | awk -F "/" '{print $1}'`
+	if [ -n "${relativePath}" ] ; then
+		printf "\n\033[1mThe path \"${1}\" can't be used.\033[m\nThe path must be absolute. Please enter an absolute path.\n"
+		return 0
+	fi
+	if [ -f "${Target}/${1}" ] ; then
+		printf "\n\033[1mThe path \"${1}\" can't be used.\033[m\nThe specified path is to a file. Please enter a different path.\n"
+		return 0
+	fi
+	for Element in "${LocalNFSHomeDirectories[@]}" ; do
+		if [ "${1}" == "${Element}" ] ; then return 1 ; fi
+	done
+	if [ -d "${Target}/${1}" ] ; then
+		printf "\n\033[1mThe path \"${1}\" already exists.\033[m\nThe folder will become the home folder for the new account.\n"
+		return 1
+	fi
+	return 1
+}
+
+function get_Users {
+	unset UserWarnings[@]
+	unset RealNames[@]
+	unset RecordNames[@]
+	unset Passwords[@]
+	unset AuthenticationHints[@]
+	unset UniqueIDs[@]
+	unset UserShells[@]
+	unset NFSHomeDirectories[@]
+	if [ -n "${Configuration}" ] ; then
+		i=0 ; while : ; do
+			realname=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:realname" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			if [ ${?} -ne 0 ] ; then break ; fi
+			UserWarnings[i]=0
+			update_RealName "${realname}"
+			if [ "${realname}" != "${RealName}" ] ; then UserWarnings[i]=1 ; fi
+			RealNames[i]="${RealName}"
+			name=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:name" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			update_RecordName "${name}"
+			if [ "${name}" != "${RecordName}" ] ; then UserWarnings[i]=1 ; fi
+			RecordNames[i]="${RecordName}"
+			Passwords[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:passwd" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			AuthenticationHints[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:hint" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			uid=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:uid" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			update_UniqueID "${uid}"
+			if [ ${uid} -ne ${UniqueID} ] ; then UserWarnings[i]=1 ; fi
+			UniqueIDs[i]=${UniqueID}
+			UserShells[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:shell" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			NFSHomeDirectories[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:home" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			let i++
+		done
+	fi
+}
+
+function display_UserAccount {
+	printf "Full Name:		"
+	if [ -n "${RealName}" ] ; then printf "${RealName}" ; else printf "-" ; fi
+	printf "\nAccount Name:		"
+	if [ -n "${RecordName}" ] ; then printf "${RecordName}" ; else printf "-" ; fi
+	printf "\nPassword:		"
+	if [ -n "${Password}" ] ; then
+		i=0 ; while [ ${i} -lt ${#Password} ] ; do printf "*" ; let i++ ; done
+	else
+		printf "-"
+	fi
+	printf "\nPassword Hint:		"
+	if [ -n "${AuthenticationHint}" ] ; then printf "${AuthenticationHint}" ; else printf "-" ; fi
+	printf "\nUser ID:		"
+	if [ -n "${UniqueID}" ] ; then printf "${UniqueID}" ; else printf "-" ; fi
+	printf "\nLogin Shell:		"
+	if [ -n "${UserShell}" ] ; then printf "${UserShell}" ; else printf "-" ; fi
+	printf "\nHome Directory:		"
+	if [ -n "${NFSHomeDirectory}" ] ; then printf "${NFSHomeDirectory}" ; else printf "-" ; fi
+	printf "\n"
+	printf "\n"
+}
+
+function set_RealName {
+	display_Subtitle "Full Name"
+	display_UserAccount
+	printf "Full name" ; if [ -n "${RealName}" ] ; then printf " (${RealName})" ; fi ; printf ": "
+	read newRealName
+	if [ -z "${newRealName}" ] || [ "${newRealName}" == "${RealName}" ] ; then return 1 ; fi
+	check_RealName "${newRealName}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nFull name" ; if [ -n "${RealName}" ] ; then printf " (${RealName})" ; fi ; printf ": "
+		read newRealName
+		if [ -z "${newRealName}" ] || [ "${newRealName}" == "${RealName}" ] ; then return 1 ; fi
+		check_RealName "${newRealName}"
+	done
+	RealName="${newRealName}"
+}
+
+function set_RecordName {
+	display_Subtitle "Account Name"
+	display_UserAccount
+	printf "Account name" ; if [ -n "${RecordName}" ] ; then printf " (${RecordName})" ; fi ; printf ": "
+	read newRecordName
+	if [ -z "${newRecordName}" ] || [ "${newRecordName}" == "${RecordName}" ] ; then return 1 ; fi
+	check_RecordName "${newRecordName}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nAccount name" ; if [ -n "${RecordName}" ] ; then printf " (${RecordName})" ; fi ; printf ": "
+		read newRecordName
+		if [ -z "${newRecordName}" ] || [ "${newRecordName}" == "${RecordName}" ] ; then return 1 ; fi
+		check_RecordName "${newRecordName}"
+	done
+	RecordName="${newRecordName}"
+}
+
+function set_Password {
+	display_Subtitle "Password"
+	display_UserAccount
+	printf "Password: " ; stty -echo ; read Password ; stty echo
+	printf "\nVerify: " ; stty -echo ; read Verify ; stty echo
+	check_Password "${Password}" "${Verify}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nPassword: " ; stty -echo ; read Password ; stty echo
+		printf "\nVerify: " ; stty -echo ; read Verify ; stty echo
+		check_Password "${Password}" "${Verify}"
+	done
+}
+
+function set_AuthenticationHint {
+	display_Subtitle "Password Hint"
+	display_UserAccount
+	printf "Password hint: " ; read AuthenticationHint
+	check_AuthenticationHint "${AuthenticationHint}" "${Password}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nPassword Hint: " ; read AuthenticationHint
+		check_AuthenticationHint "${AuthenticationHint}" "${Password}"
+	done
+}
+
+function set_UniqueID {
+	display_Subtitle "User ID"
+	display_UserAccount
+	printf "User ID" ; if [ -n "${UniqueID}" ] ; then printf " (${UniqueID})" ; fi ; printf ": "
+	read newUniqueID
+	if [ -z "${newUniqueID}" ] || [ "${newUniqueID}" == "${UniqueID}" ] ; then return 1 ; fi
+	check_UniqueID "${newUniqueID}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nUser ID" ; if [ -n "${UniqueID}" ] ; then printf " (${UniqueID})" ; fi ; printf ": "
+		read newUniqueID
+		if [ -z "${newUniqueID}" ] || [ "${newUniqueID}" == "${UniqueID}" ] ; then return 1 ; fi
+		check_UniqueID "${newUniqueID}"
+	done
+	UniqueID="${newUniqueID}"
+}
+
+function select_UserShell {
+	UserShells=( "/bin/bash" "/bin/tcsh" "/bin/sh" "/bin/csh" "/bin/zsh" "/bin/ksh" )
+	display_Subtitle "Login Shell"
+	display_UserAccount
+	display_Options "Login shells" "Select a login shell: "
+	select UserShell in "${UserShells[@]}" ; do
+		if [ -n "${UserShell}" ] ; then break ; fi
+	done
+}
+
+function set_NFSHomeDirectory {
+	display_Subtitle "Home Directory"
+	display_UserAccount
+	printf "Home directory" ; if [ -n "${NFSHomeDirectory}" ] ; then printf " (${NFSHomeDirectory})" ; fi ; printf ": "
+	read newNFSHomeDirectory
+	if [ -z "${newNFSHomeDirectory}" ] || [ "${newNFSHomeDirectory}" == "${NFSHomeDirectory}" ] ; then return 1 ; fi
+	check_NFSHomeDirectory "${newNFSHomeDirectory}"
+	while [ ${?} -ne 1 ] ; do
+		printf "\nHome directory" ; if [ -n "${NFSHomeDirectory}" ] ; then printf " (${NFSHomeDirectory})" ; fi ; printf ": "
+		read newNFSHomeDirectory
+		if [ -z "${newNFSHomeDirectory}" ] || [ "${newNFSHomeDirectory}" == "${NFSHomeDirectory}" ] ; then return 1 ; fi
+		check_NFSHomeDirectory "${newNFSHomeDirectory}"
+	done
+	NFSHomeDirectory="${newNFSHomeDirectory}"
+}
+
+function menu_AddUser {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
+	unset RealName
+	unset RecordName
+	unset Password
+	unset AuthenticationHint
+	update_UniqueID 501
+	UserShell="/bin/bash"
+	NFSHomeDirectory="/var/empty"
+	UserOptions=( "User Accounts Menu" "Full Name" "Account Name" "Password" "Password Hint" "User ID" "Login shell" "Home Directory" )
+	while [ "${Option}" != "User Accounts Menu" ] ; do
+		display_Subtitle "Add User"
+		display_UserAccount
+		display_Options "Options" "Select an option: "
+		select Option in "${UserOptions[@]}" ; do
+			case "${Option}" in
+				"User Accounts Menu" ) break ;;
+				"Full Name" ) set_RealName ; update_RecordName "${RealName}" ; update_NFSHomeDirectory "${RecordName}" ; unset Option ; break ;;
+				"Account Name" ) set_RecordName ; update_NFSHomeDirectory "${RecordName}" ; unset Option ; break ;;
+				"Password" ) set_Password ; unset Option ; break ;;
+				"Password Hint" ) set_AuthenticationHint ; unset Option ; break ;;
+				"User ID" ) set_UniqueID ; unset Option ; break ;;
+				"Login shell" ) select_UserShell ; unset Option ; break ;;
+				"Home Directory" ) set_NFSHomeDirectory ; unset Option ; break ;;
+			esac
+		done
+	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
+	unset Option
+	if [ -n "${RealName}" ] && [ -n "${RecordName}" ] ; then
+		RealNames=( "${RealNames[@]}" "${RealName}" )
+		RecordNames=( "${RecordNames[@]}" "${RecordName}" )
+		Passwords=( "${Passwords[@]}" "${Password}" )
+		AuthenticationHints=( "${AuthenticationHints[@]}" "${AuthenticationHint}" )
+		UniqueIDs=( ${UniqueIDs[@]} ${UniqueID} )
+		UserShells=( "${UserShells[@]}" "${UserShell}" )
+		NFSHomeDirectories=( "${NFSHomeDirectories[@]}" "${NFSHomeDirectory}" )
+	fi
+}
+
+function menu_EditUser {
+	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
+	display_Subtitle "Edit User"
+	if [ ${#RealNames[@]} -eq 0 ] ; then
+		press_anyKey "No users available, please create a user first."
+		return 0
+	fi
+	display_Options "Users" "Select a user: "
+	select RealName in "${RealNames[@]}" ; do
+		if [ -n "${RealName}" ] ; then break ; fi
+	done
+	i=0 ; for Element in "${RealNames[@]}" ; do
+		if [ "${Element}" == "${RealName}" ] ; then break ; fi
+		let i++
+	done
+	unset RealNames[i]
+	RecordName="${RecordNames[i]}" ; unset RecordNames[i]
+	Password="${Passwords[i]}" ; unset Passwords[i]
+	AuthenticationHints="${AuthenticationHints[i]}" ; unset AuthenticationHints[i]
+	UniqueID=${UniqueIDs[i]} ; unset UniqueIDs[i]
+	UserShell="${UserShells[i]}" ; unset UserShells[i]
+	NFSHomeDirectory="${NFSHomeDirectories[i]}" ; unset NFSHomeDirectories[i]
+	UserOptions=( "User Accounts Menu" "Full Name" "Account Name" "Password" "Password Hint" "User ID" "Login shell" "Home Directory" )
+	while [ "${Option}" != "User Accounts Menu" ] ; do
+		display_Subtitle "Edit User"
+		display_UserAccount
+		display_Options "Options" "Select an option: "
+		select Option in "${UserOptions[@]}" ; do
+			case "${Option}" in
+				"User Accounts Menu" ) break ;;
+				"Full Name" ) set_RealName ; unset Option ; break ;;
+				"Account Name" ) set_RecordName ; unset Option ; break ;;
+				"Password" ) set_Password ; unset Option ; break ;;
+				"Password Hint" ) set_AuthenticationHint ; unset Option ; break ;;
+				"User ID" ) set_UniqueID ; unset Option ; break ;;
+				"Login shell" ) select_UserShell ; unset Option ; break ;;
+				"Home Directory" ) set_NFSHomeDirectory ; unset Option ; break ;;
+			esac
+		done
+	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
+	unset Option
+	RealNames=( "${RealNames[@]}" "${RealName}" )
+	RecordNames=( "${RecordNames[@]}" "${RecordName}" )
+	Passwords=( "${Passwords[@]}" "${Password}" )
+	AuthenticationHints=( "${AuthenticationHints[@]}" "${AuthenticationHint}" )
+	UniqueIDs=( ${UniqueIDs[@]} ${UniqueID} )
+	UserShells=( "${UserShells[@]}" "${UserShell}" )
+	NFSHomeDirectories=( "${NFSHomeDirectories[@]}" "${NFSHomeDirectory}" )
+}
+
+function menu_DeleteUser {
+	display_Subtitle "Delete User"
+	if [ ${#RealNames[@]} -eq 0 ] ; then
+		press_anyKey "No users available, please create a user first."
+		return 0
+	fi
+	display_Options "Users" "Select a user: "
+	select RealName in "${RealNames[@]}" ; do
+		if [ -n "${RealName}" ] ; then break ; fi
+	done
+	i=0 ; for Element in "${RealNames[@]}" ; do
+		if [ "${Element}" == "${RealName}" ] ; then break ; fi
+		let i++
+	done
+	unset ConfirmDelete
+	while [ -z "${ConfirmDelete}" ] ; do
+		echo
+		read -sn 1 -p "Are you sure you want to delete the user account \"${RealName}\" (Y/n)? " ConfirmDelete < /dev/tty
+		if [ -z "${ConfirmDelete}" ] ; then ConfirmDelete="y" ; fi
+		echo
+		case "${ConfirmDelete}" in
+			"Y" | "y" ) unset RealNames[i] ; unset RecordNames[i] ; unset Passwords[i] ; unset AuthenticationHints[i] ; unset UniqueIDs[i] ; unset UserShells[i] ; unset NFSHomeDirectories[i] ; echo ;;
+			"N" | "n" ) echo ;;
+			* ) echo ; unset ConfirmDelete ;;
+		esac
+	done
+	unset ConfirmDelete
+	unset RealName
+}
+
+function menu_UserAccounts {
+	AccountOptions=( "Configuration Menu" "Add User" "Edit User" "Delete User" )
+	while [ "${Option}" != "Configuration Menu" ] ; do
+		display_Subtitle "User Accounts"
+		display_Options "Options" "Select an option: "
+		select Option in "${AccountOptions[@]}" ; do
+			case "${Option}" in
+				"Configuration Menu" ) break ;;
+				"Add User" ) menu_AddUser ; unset Option ; break ;;
+				"Edit User" ) menu_EditUser ; unset Option ; break ;;
+				"Delete User" ) menu_DeleteUser ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
 function display_Output {
 	display_Title
 	echo
@@ -5331,105 +5873,6 @@ function display_Output {
 	press_anyKey
 }
 
-function menu_SystemSettings {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
-	SystemOptions=( "Configuration Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
-	while [ "${Option}" != "Configuration Menu" ] ; do
-		display_Subtitle "System Settings"
-		display_SystemSettings
-		display_Options "Options" "Select an option: "
-		select Option in "${SystemOptions[@]}" ; do
-			case "${Option}" in
-				"Configuration Menu" ) break ;;
-				"Language" ) select_Language ; unset Option ; break ;;
-				"Country" ) select_Country ; unset Option ; break ;;
-				"Keyboard" ) select_Keyboard ; unset Option ; break ;;
-				"Location Services" ) set_LocationServices ; unset Option ; break ;;
-				"Network Time Server" ) select_NTPServer ; unset Option ; break ;;
-				"Time Zone" ) select_TimeZone ; unset Option ; break ;;
-				"Remote Login" ) select_RemoteLogin ; unset Option ; break ;;
-				"Remote Management" ) select_RemoteManagement ; unset Option ; break ;;
-				"Computer Name" ) not_Implemented ; unset Option ; break ;;
-			esac
-		done
-	done
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
-	unset Option
-}
-
-function menu_AddUser {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
-	AddUserOptions=( "User Accounts Menu" "Full Name" "Account Name" "User ID" "Password" "Automatic Login" "Password Hint" "Login shell" "Home Directory" )
-	while [ "${Option}" != "User Accounts Menu" ] ; do
-		display_Subtitle "Add User"
-		display_Options "Options" "Select an option: "
-		select Option in "${AddUserOptions[@]}" ; do
-			case "${Option}" in
-				"User Accounts Menu" ) break ;;
-				"Full Name" ) not_Implemented ; unset Option ; break ;;
-				"Account Name" ) not_Implemented ; unset Option ; break ;;
-				"User ID" ) not_Implemented ; unset Option ; break ;;
-				"Password" ) not_Implemented ; unset Option ; break ;;
-				"Automatic Login" ) not_Implemented ; unset Option ; break ;;
-				"Password Hint" ) not_Implemented ; unset Option ; break ;;
-				"Login shell" ) not_Implemented ; unset Option ; break ;;
-				"Home Directory" ) not_Implemented ; unset Option ; break ;;
-			esac
-		done
-	done
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
-	unset Option
-}
-
-function menu_EditUser {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
-	EditUserOptions=( "User Accounts Menu" "Select User" )
-	while [ "${Option}" != "User Accounts Menu" ] ; do
-		display_Subtitle "Edit User"
-		display_Options "Options" "Select an option: "
-		select Option in "${EditUserOptions[@]}" ; do
-			case "${Option}" in
-				"User Accounts Menu" ) break ;;
-				"Select User" ) not_Implemented ; unset Option ; break ;;
-			esac
-		done
-	done
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
-	unset Option
-}
-
-function menu_DeleteUser {
-	DeleteUserOptions=( "User Accounts Menu" "Select User" )
-	while [ "${Option}" != "User Accounts Menu" ] ; do
-		display_Subtitle "Delete User"
-		display_Options "Options" "Select an option: "
-		select Option in "${EditUserOptions[@]}" ; do
-			case "${Option}" in
-				"User Accounts Menu" ) break ;;
-				"Select User" ) not_Implemented ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-}
-
-function menu_UserAccounts {
-	AccountOptions=( "Configuration Menu" "Add User" "Edit User" "Delete User" )
-	while [ "${Option}" != "Configuration Menu" ] ; do
-		display_Subtitle "User Accounts"
-		display_Options "Options" "Select an option: "
-		select Option in "${AccountOptions[@]}" ; do
-			case "${Option}" in
-				"Configuration Menu" ) break ;;
-				"Add User" ) menu_AddUser ; unset Option ; break ;;
-				"Edit User" ) menu_EditUser ; unset Option ; break ;;
-				"Delete User" ) menu_DeleteUser ; unset Option ; break ;;
-			esac
-		done
-	done
-	unset Option
-}
-
 function menu_Packages {
 	display_Subtitle "Function not Implemented"
 	sleep 2
@@ -5492,6 +5935,7 @@ privelege_Check
 get_LicenseStatus
 menu_License
 get_SystemOSVersion
+get_LocalUsers
 get_ConfigurationFolder
 get_LibraryFolder
 get_PackageFolder
