@@ -29,9 +29,21 @@ ExportType=1
 ScanImage=1
 # FirstBoot Script Path
 FirstBootPath="/usr/libexec/FirstBoot"
+# Default System Configuration
+Language="English"
+SACountryCode="US"
+InputSourceID="US"
+LocationServices=0
+NTPServerName="Apple Americas/U.S. (time.apple.com)"
+NTPServer="time.apple.com"
+NTPEnabled=1
+GeonameID=5341145
+TZAuto=0
+RemoteLogin=0
+RemoteManagement=0
 
 # Version
-SICVersion="1.5a2"
+SICVersion="1.5a3"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -541,6 +553,15 @@ function menu_ExportSettings {
 	unset SaveDefaults
 }
 
+function get_Preferences {
+	get_ConfigurationFolder
+	get_LibraryFolder
+	get_PackageFolder
+	get_MasterFolder
+	get_VolumeName
+	get_ImageSize
+}
+
 function menu_Preferences {
 	PrefOptions=( "Main Menu" "Default Folders" "Image Settings" "Export Settings" )
 	while [ "${Option}" != "Main Menu" ] ; do
@@ -841,7 +862,7 @@ function get_Volumes {
 function get_Images {
 	unset Images[@]
 	IFS=$'\n'
-	Images=( `ls "${LibraryFolder}/"*.dmg | awk -F "${LibraryFolder}/" '{print $NF}'` )
+	Images=( `find "${LibraryFolder}" -name "*.dmg" -exec basename {} \;` )
 	unset IFS
 }
 
@@ -993,11 +1014,6 @@ function refresh_Language {
 	set_AppleLanguages "${LanguageCode}"
 }
 
-function get_Language {
-	Language=`defaults read ~/Library/Preferences/au.com.mondada.SIC "Language" 2>/dev/null`
-	refresh_Language
-}
-
 function set_Localization {
 	# ${1}: Language Name
 	case "${1}" in
@@ -1072,10 +1088,6 @@ function set_ITLB {
 		"ko" ) ITLB=17919 ;;
 		* ) ITLB=16383 ;;
 	esac
-}
-
-function save_Language {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "Language" -string "${Language}"
 }
 
 # Section: Country
@@ -1479,11 +1491,6 @@ function refresh_Country {
 	e=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${SACountryCode}" ] ; then e=1 ; break ; fi ; done
 	if [ ${e} -eq 0 ] ; then SACountryCode="US" ; fi
 	SACountry=`convert_SACountryCodeToName ${TargetOSMinor} "${SACountryCode}"`
-}
-
-function get_CountryCode {
-	SACountryCode=`defaults read ~/Library/Preferences/au.com.mondada.SIC "SACountryCode" 2>/dev/null`
-	refresh_Country
 }
 
 function set_LanguageCountryCodes {
@@ -1995,10 +2002,6 @@ function set_ResourceID {
 	esac
 }
 
-function save_Country {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "SACountryCode" -string "${SACountryCode}"
-}
-
 # Section: Keyboard
 
 function set_SAKeyboard_SATypingStyle {
@@ -2224,11 +2227,6 @@ function refresh_Keyboard {
 	e=0 ; for ID in "${InputSourceIDs[@]}" ; do if [ "${ID}" == "${InputSourceID}" ] ; then e=1 ; break ; fi ; done
 	if [ ${e} -eq 0 ] ; then InputSourceID="US" ; fi
 	set_SAKeyboard_SATypingStyle "${InputSourceID}"
-}
-
-function get_Keyboard {
-	InputSourceID=`defaults read ~/Library/Preferences/au.com.mondada.SIC "InputSourceID" 2>/dev/null`
-	refresh_Keyboard
 }
 
 function set_AllKeyboards {
@@ -3525,25 +3523,7 @@ function set_InputSourceID {
 	esac
 }
 
-function save_Keyboard {
-	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "InputSourceID" -string "${InputSourceID}"
-}
-
 # Section: Location Services
-
-function get_LocationServices {
-	LocationServices=`defaults read ~/Library/Preferences/au.com.mondada.SIC "LocationServices" 2>/dev/null`
-	if [ ${?} -ne 0 ] ; then LocationServices=0 ; fi
-}
-
-function save_LocationServices {
-	if [ ${LocationServices} -eq 1 ] ;then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "LocationServices" -bool TRUE
-	else
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "LocationServices" -bool FALSE
-	fi
-}
 
 # Section: NTP Settings
 
@@ -3555,14 +3535,6 @@ function set_NTPServerName {
 		"time.euro.apple.com" ) NTPServerName="Apple Europe (time.euro.apple.com)" ;;
 		* ) NTPServerName="${1}" ;;
 	esac
-}
-
-function get_NTPSettings {
-	NTPEnabled=`defaults read ~/Library/Preferences/au.com.mondada.SIC "NTPEnabled" 2>/dev/null`
-	if [ -z "${NTPEnabled}" ] ; then NTPEnabled=1 ; fi
-	NTPServer=`defaults read ~/Library/Preferences/au.com.mondada.SIC "NTPServer" 2>/dev/null`
-	if [ -z "${NTPServer}" ] ; then NTPServer="time.apple.com" ; fi
-	set_NTPServerName "${NTPServer}"
 }
 
 function set_NTPServerNames {
@@ -3579,15 +3551,6 @@ function set_NTPServer {
 		"Apple Europe (time.euro.apple.com)" ) NTPServer="time.euro.apple.com" ;;
 		* ) NTPServer="${1}" ;;
 	esac
-}
-
-function save_NTPSettings {
-	if [ ${NTPEnabled} -eq 1 ] ;then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "NTPEnabled" -bool TRUE
-	else
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "NTPEnabled" -bool FALSE
-	fi
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "NTPServer" -string "${NTPServer}"
 }
 
 # Section: Time Zone
@@ -4260,13 +4223,6 @@ function refresh_GeonameID {
 	TimeZone=$(set_TimeZone "$(set_TZFile ${GeonameID})")
 }
 
-function get_GeonameID {
-	GeonameID=`defaults read ~/Library/Preferences/au.com.mondada.SIC "GeonameID" 2>/dev/null`
-	TZAuto=`defaults read ~/Library/Preferences/au.com.mondada.SIC "TZAuto" 2>/dev/null`
-	if [ -z "${TZAuto}" ] ; then TZAuto=0 ; fi
-	refresh_GeonameID
-}
-
 function set_CountryTimeZones {
 	# ${1}: Country Code
 	unset CountryTZFiles[@]
@@ -4559,44 +4515,9 @@ function set_ClosestCities {
 	printf "\bdone\n"
 }
 
-function save_GeonameID {
-	defaults write ~/Library/Preferences/au.com.mondada.SIC "GeonameID" -int ${GeonameID}
-	if [ ${TZAuto} -eq 1 ] ;then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "TZAuto" -bool TRUE
-	else
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "TZAuto" -bool FALSE
-	fi
-}
-
 # Section: Remote Login
 
-function get_RemoteLogin {
-	RemoteLogin=`defaults read ~/Library/Preferences/au.com.mondada.SIC "RemoteLogin" 2>/dev/null`
-	if [ ${?} -ne 0 ] ; then RemoteLogin=0 ; fi
-}
-
-function save_RemoteLogin {
-	if [ ${RemoteLogin} -eq 1 ] ;then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "RemoteLogin" -bool TRUE
-	else
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "RemoteLogin" -bool FALSE
-	fi
-}
-
 # Section: Remote Management
-
-function get_RemoteManagement {
-	RemoteManagement=`defaults read ~/Library/Preferences/au.com.mondada.SIC "RemoteManagement" 2>/dev/null`
-	if [ ${?} -ne 0 ] ; then RemoteManagement=0 ; fi
-}
-
-function save_RemoteManagement {
-	if [ ${RemoteManagement} -eq 1 ] ;then
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "RemoteManagement" -bool TRUE
-	else
-		defaults write ~/Library/Preferences/au.com.mondada.SIC "RemoteManagement" -bool FALSE
-	fi
-}
 
 # Section: Runtime
 
@@ -4925,17 +4846,6 @@ function select_RemoteManagement {
 	unset EnableARD
 }
 
-function save_Settings {
-	save_Language
-	save_Country
-	save_Keyboard
-	save_LocationServices
-	save_NTPSettings
-	save_GeonameID
-	save_RemoteLogin
-	save_RemoteManagement
-}
-
 function display_SystemSettings {
 	display_Language
 	display_CountryName
@@ -5175,40 +5085,6 @@ function check_NFSHomeDirectory {
 		return 1
 	fi
 	return 1
-}
-
-function get_Users {
-	unset UserWarnings[@]
-	unset RealNames[@]
-	unset RecordNames[@]
-	unset Passwords[@]
-	unset AuthenticationHints[@]
-	unset UniqueIDs[@]
-	unset UserShells[@]
-	unset NFSHomeDirectories[@]
-	if [ -n "${Configuration}" ] ; then
-		i=0 ; while : ; do
-			realname=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:realname" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			if [ ${?} -ne 0 ] ; then break ; fi
-			UserWarnings[i]=0
-			update_RealName "${realname}"
-			if [ "${realname}" != "${RealName}" ] ; then UserWarnings[i]=1 ; fi
-			RealNames[i]="${RealName}"
-			name=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:name" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			update_RecordName "${name}"
-			if [ "${name}" != "${RecordName}" ] ; then UserWarnings[i]=1 ; fi
-			RecordNames[i]="${RecordName}"
-			Passwords[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:passwd" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			AuthenticationHints[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:hint" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			uid=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:uid" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			update_UniqueID "${uid}"
-			if [ ${uid} -ne ${UniqueID} ] ; then UserWarnings[i]=1 ; fi
-			UniqueIDs[i]=${UniqueID}
-			UserShells[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:shell" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			NFSHomeDirectories[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:home" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
-			let i++
-		done
-	fi
 }
 
 function display_UserAccount {
@@ -5470,422 +5346,175 @@ function menu_UserAccounts {
 	unset Option
 }
 
-function display_Output {
-	display_Title
-	echo
-	display_Target
-	set_Localization "${Language}"
-	FirstBoot=0
-	if [ ${RemoteManagement} -eq 1 ] ; then FirstBoot=1 ; fi
-	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then FirstBoot=1 ; fi
-	if [ ${FirstBoot} -eq 1 ] ; then
-		printf "\033[1m/Library/LaunchDaemons/FirstBoot.plist\033[m\n"
-		echo "Dict {"
-		echo "    Label = FirstBoot"
-		echo "    ProgramArguments = Array {"
-		echo "        ${FirstBootPath}/FirstBoot.sh"
-		echo "    }"
-		echo "    RunAtLoad = true"
-		echo "}"
-		echo
-	fi
-	printf "\033[1m/Library/Preferences/.GlobalPreferences.plist\033[m\n"
-	echo "Dict {"
-	echo "    com.apple.AppleModemSettingTool.LastCountryCode = ${TZCountryCode}"
-	if [ ${UseGeoKit} -eq 0 ] ; then
-		echo "    com.apple.TimeZonePref.Last_Selected_City = Array {"
-		i=0 ; for Item in "${all_cities_adj_7[@]}" ; do
-			if [ "${Item}" == "${GeonameID}" ] ; then break ; fi
-			let i++
-		done
-		echo "        ${all_cities_adj_0[i]}"
-		echo "        ${all_cities_adj_1[i]}"
-		echo "        ${all_cities_adj_2[i]}"
-		echo "        ${all_cities_adj_3[i]}"
-		echo "        ${all_cities_adj_4[i]}"
-		echo "        ${all_cities_adj_5[i]}"
-		echo "        ${all_cities_adj_6[i]}"
-		if [ -d "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj" ] ; then
-			IsPlist=`file "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings" | grep -vq "property list" ; echo ${?}`
-			if [ ${IsPlist} -eq 1 ] ; then
-				LocalizedCity=`/usr/libexec/PlistBuddy -c "Print ':${all_cities_adj_5[i]}'" "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings"`
-				LocalizedCountry=`/usr/libexec/PlistBuddy -c "Print ':${all_cities_adj_6[i]}'" "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Countries.strings"`
-			else
-				LocalizedCity=`cat "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_5[i]}\"" | awk -F "\"" '{print $4}'`
-				LocalizedCountry=`cat "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Countries.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_6[i]}\"" | awk -F "\"" '{print $4}'`
-			fi
-		else
-			LocalizedCity="${Localizable_Cities[i]}"
-			LocalizedCountry="${Localizable_Countries[i]}"
-		fi
-		echo "        ${LocalizedCity}"
-		echo "        ${LocalizedCountry}"
-		echo "    }"
-	else
-		echo "    com.apple.preferences.timezone.selected_city = Dict {"
-		Query="select ZLATITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZLATITUDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        Latitude = ${ZLATITUDE}"
-		Query="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZREGIONALCODE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		if [ -n "${ZREGIONALCODE}" ] ; then echo "        RegionalCode = ${ZREGIONALCODE}" ; fi
-		echo "        Version = 1"
-		Query="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZTIMEZONENAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        TimeZoneName = ${ZTIMEZONENAME}"
-		Query="select ZPOPULATION from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZPOPULATION=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        Population = ${ZPOPULATION}"
-		echo "        GeonameID = ${GeonameID}"
-		Query="select ZLONGITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZLONGITUDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        Longitude = ${ZLONGITUDE}"
-		Query="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZCOUNTRY=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZCODE from ${PLACES} where Z_PK = ${ZCOUNTRY};"
-		ZCODE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        CountryCode = ${ZCODE}"
-		Query="select ZNAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		ZNAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        Name = ${ZNAME}"
-		Query="select Z_PK from ${PLACES} where ZGEONAMEID = ${GeonameID};"
-		Z_PK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		echo "        LocalizedNames = Dict {"
-		Query="select ZNAME from ZGEOPLACENAME where ZAR <> 0 and ZPLACE = ${Z_PK};"
-		ZAR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZCA <> 0 and ZPLACE = ${Z_PK};"
-		ZCA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZCS <> 0 and ZPLACE = ${Z_PK};"
-		ZCS=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZDA <> 0 and ZPLACE = ${Z_PK};"
-		ZDA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZDE <> 0 and ZPLACE = ${Z_PK};"
-		ZDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZEL <> 0 and ZPLACE = ${Z_PK};"
-		ZEL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZEN <> 0 and ZPLACE = ${Z_PK};"
-		ZEN=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZES <> 0 and ZPLACE = ${Z_PK};"
-		ZES=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZFI <> 0 and ZPLACE = ${Z_PK};"
-		ZFI=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZFR <> 0 and ZPLACE = ${Z_PK};"
-		ZFR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZHE <> 0 and ZPLACE = ${Z_PK};"
-		ZHE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZHR <> 0 and ZPLACE = ${Z_PK};"
-		ZHR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZHU <> 0 and ZPLACE = ${Z_PK};"
-		ZHU=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		# Query="select ZNAME from ZGEOPLACENAME where ZID <> 0 and ZPLACE = ${Z_PK};"
-		# ZID=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZIT <> 0 and ZPLACE = ${Z_PK};"
-		ZIT=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZJA <> 0 and ZPLACE = ${Z_PK};"
-		ZJA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZKO <> 0 and ZPLACE = ${Z_PK};"
-		ZKO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		# Query="select ZNAME from ZGEOPLACENAME where ZMS <> 0 and ZPLACE = ${Z_PK};"
-		# ZMS=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZNL <> 0 and ZPLACE = ${Z_PK};"
-		ZNL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZNO <> 0 and ZPLACE = ${Z_PK};"
-		ZNO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZPL <> 0 and ZPLACE = ${Z_PK};"
-		ZPL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZPT <> 0 and ZPLACE = ${Z_PK};"
-		ZPT=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZPT_BR <> 0 and ZPLACE = ${Z_PK};"
-		ZPT_BR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZRO <> 0 and ZPLACE = ${Z_PK};"
-		ZRO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZRU <> 0 and ZPLACE = ${Z_PK};"
-		ZRU=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZSK <> 0 and ZPLACE = ${Z_PK};"
-		ZSK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZSV <> 0 and ZPLACE = ${Z_PK};"
-		ZSV=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZTH <> 0 and ZPLACE = ${Z_PK};"
-		ZTH=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZTR <> 0 and ZPLACE = ${Z_PK};"
-		ZTR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZUK <> 0 and ZPLACE = ${Z_PK};"
-		ZUK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		# Query="select ZNAME from ZGEOPLACENAME where ZVI <> 0 and ZPLACE = ${Z_PK};"
-		# ZVI=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZZH <> 0 and ZPLACE = ${Z_PK};"
-		ZZH=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		Query="select ZNAME from ZGEOPLACENAME where ZZH_TW <> 0 and ZPLACE = ${Z_PK};"
-		ZZH_TW=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		case ${TargetOSMinor} in
-			6 )
-				echo "            da = ${ZDA}" ;
-				echo "            nl = ${ZNL}" ;
-				echo "            ko = ${ZKO}" ;
-				echo "            zh-Hant = ${ZZH_TW}" ;
-				echo "            ja = ${ZJA}" ;
-				echo "            pt-PT = ${ZPT}" ;
-				echo "            fr = ${ZFR}" ;
-				echo "            zh-Hans = ${ZZH}" ;
-				echo "            it = ${ZIT}" ;
-				echo "            fi = ${ZFI}" ;
-				echo "            sv = ${ZSV}" ;
-				echo "            pt = ${ZPT_BR}" ;
-				echo "            en = ${ZEN}" ;
-				echo "            ru = ${ZRU}" ;
-				echo "            es = ${ZES}" ;
-				echo "            pl = ${ZPL}" ;
-				echo "            de = ${ZDE}" ;;
-			7 )
-				echo "            da = ${ZDA}" ;
-				echo "            nl = ${ZNL}" ;
-				echo "            ko = ${ZKO}" ;
-				echo "            zh-Hant = ${ZZH_TW}" ;
-				echo "            ja = ${ZJA}" ;
-				echo "            pt-PT = ${ZPT}" ;
-				echo "            fr = ${ZFR}" ;
-				echo "            it = ${ZIT}" ;
-				echo "            ru = ${ZRU}" ;
-				echo "            pt = ${ZPT_BR}" ;
-				echo "            fi = ${ZFI}" ;
-				echo "            zh-Hans = ${ZZH}" ;
-				echo "            sv = ${ZSV}" ;
-				echo "            en = ${ZEN}" ;
-				echo "            es = ${ZES}" ;
-				echo "            pl = ${ZPL}" ;
-				echo "            de = ${ZDE}" ;;
-			8 )
-				echo "            ro = ${ZRO}" ;
-				echo "            tr = ${ZTR}" ;
-				echo "            es = ${ZES}" ;
-				echo "            nb = ${ZNO}" ;
-				echo "            ca = ${ZCA}" ;
-				echo "            el = ${ZEL}" ;
-				echo "            pt-PT = ${ZPT}" ;
-				echo "            fi = ${ZFI}" ;
-				echo "            nl = ${ZNL}" ;
-				echo "            fr = ${ZFR}" ;
-				echo "            sv = ${ZSV}" ;
-				echo "            hu = ${ZHU}" ;
-				echo "            cs = ${ZCS}" ;
-				echo "            he = ${ZHE}" ;
-				echo "            en = ${ZEN}" ;
-				echo "            da = ${ZDA}" ;
-				echo "            it = ${ZIT}" ;
-				echo "            ja = ${ZJA}" ;
-				echo "            uk = ${ZUK}" ;
-				echo "            zh-Hans = ${ZZH}" ;
-				echo "            ko = ${ZKO}" ;
-				echo "            ar = ${ZAR}" ;
-				echo "            ru = ${ZRU}" ;
-				echo "            zh-Hant = ${ZZH_TW}" ;
-				echo "            th = ${ZTH}" ;
-				echo "            sk = ${ZSK}" ;
-				echo "            pt = ${ZPT_BR}" ;
-				echo "            hr = ${ZHR}" ;
-				echo "            pl = ${ZPL}" ;
-				echo "            de = ${ZDE}" ;;
-		esac
-		echo "        }"
-		echo "    }"
-	fi
-	if [ ${TargetOSMinor} -gt 5 ] ; then
-		echo "    Country = ${SACountryCode}"
-		echo "    AppleLocale = ${LanguageCode}_${SACountryCode}"
-	fi
-	set_AppleLanguages "${LanguageCode}"
-	echo "    AppleLanguages = Array {"
-	for Item in "${AppleLanguages[@]}" ; do
-		echo "        ${Item}"
-	done
-	echo "    }"
-	if [ ${TargetOSMinor} -eq 5 ] ; then echo "    Country = ${SACountryCode}" ; fi
-	if [ ${UseGeoKit} -eq 1 ] ; then
-		echo "    com.apple.TimeZonePref.Last_Selected_City = Array {"
-		echo "        ${ZLATITUDE}"
-		echo "        ${ZLONGITUDE}"
-		echo "        0"
-		echo "        ${ZTIMEZONENAME}"
-		echo "        ${ZCODE}"
-		echo "        ${ZNAME}"
-		Query="select ZNAME from ${PLACES} where Z_PK = ${ZCOUNTRY};"
-		ZCOUNTRYNAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`	
-		echo "        ${ZCOUNTRYNAME}"
-		echo "        ${ZNAME}"
-		echo "        ${ZCOUNTRYNAME}"
-		echo "        DEPRECATED IN 10.6"
-		echo "    }"
-	fi
-	echo "}"
-	echo
-	printf "\033[1m/Library/Preferences/com.apple.HIToolbox.plist\033[m\n"
-	echo "Dict {"
-	if [ -n "${SATypingStyle}" ] ; then
-		set_Bundle_IDs "${SATypingStyle}"
-		set_Input_Modes "${SATypingStyle}"
-		set_InputSourceKinds "${SATypingStyle}"
-		set_KeyboardLayout_IDs "${SATypingStyle}"
-		set_KeyboardLayout_Names "${SATypingStyle}"
-		set_SelectedInputSource "${SATypingStyle}"
-		set_CurrentKeyboardLayoutInputSourceID "${SATypingStyle}"
-	else
-		unset Bundle_IDs[@]
-		unset Input_Modes[@]
-		set_InputSourceKinds "${SAKeyboard}"
-		set_KeyboardLayout_IDs "${SAKeyboard}"
-		set_KeyboardLayout_Names "${SAKeyboard}"
-		set_SelectedInputSource "${SAKeyboard}"
-		set_CurrentKeyboardLayoutInputSourceID "${SAKeyboard}"
-	fi
-	set_DefaultAsciiInputSource
-	if [ ${TargetOSMinor} -gt 5 ] ; then echo "AppleCurrentKeyboardLayoutInputSourceID = ${CurrentKeyboardLayoutInputSourceID}" ; fi
-	echo "    AppleDefaultAsciiInputSource = Dict {"
-	echo "        InputSourceKind = ${InputSourceKind}"
-	echo "        KeyboardLayout ID = ${KeyboardLayout_ID}"
-	echo "        KeyboardLayout Name = ${KeyboardLayout_Name}"
-	echo "    }"
-	echo "    AppleEnabledInputSources = Array {"
-	i=0 ; while [ ${i} -lt ${#InputSourceKinds[@]} ] ; do
-		echo "        Dict {"
-		if [ -n "${InputSourceKinds[i]}" ] ; then echo "            InputSourceKind = ${InputSourceKinds[i]}" ; fi
-		if [ -n "${Bundle_IDs[i]}" ] ; then echo "            Bundle ID = ${Bundle_IDs[i]}" ; fi
-		if [ -n "${KeyboardLayout_IDs[i]}" ] ; then echo "            KeyboardLayout ID = ${KeyboardLayout_IDs[i]}" ; fi
-		if [ -n "${Input_Modes[i]}" ] ; then echo "            Input Mode = ${Input_Modes[i]}" ; fi
-		if [ -n "${KeyboardLayout_Names[i]}" ] ; then echo "            KeyboardLayout Name = ${KeyboardLayout_Names[i]}" ; fi
-		echo "        }"
-		let i++
-	done
-	set_ScriptManager "${LanguageCode}"
-	if [ ${TargetOSMinor} -eq 5 ] ; then set_ITLB "${LanguageCode}" ; else unset ITLB ; fi
-	if [ -n "${ITLB}" ] ; then
-		echo "    AppleItlbDate = Dict {"
-		echo "        ${ScriptManager} = ${ITLB}"
-		echo "    }"
-	fi
-	set_ResourceID "${LanguageCode}" "${SACountryCode}"
-	if [ -n "${ResourceID}" ] ; then
-		echo "    AppleDateResID = Dict {"
-		echo "        ${ScriptManager} = ${ResourceID}"
-		echo "    }"
-	fi
-	if [ -n "${ITLB}" ] ; then
-		echo "    AppleItlbNumber = Dict {"
-		echo "        ${ScriptManager} = ${ITLB}"
-		echo "    }"
-	fi
-	if [ -n "${ResourceID}" ] ; then
-		echo "    AppleNumberResID = Dict {"
-		echo "        ${ScriptManager} = ${ResourceID}"
-		echo "    }"
-	fi
-	echo "    AppleSelectedInputSources = Array {"
-	echo "        Dict {"
-	if [ -n "${InputSourceKinds[SelectedInputSource]}" ] ; then echo "            InputSourceKind = ${InputSourceKinds[SelectedInputSource]}" ; fi
-	if [ -n "${Bundle_IDs[SelectedInputSource]}" ] ; then echo "            Bundle ID = ${Bundle_IDs[SelectedInputSource]}" ; fi
-	if [ -n "${KeyboardLayout_IDs[SelectedInputSource]}" ] ; then echo "            KeyboardLayout ID = ${KeyboardLayout_IDs[SelectedInputSource]}" ; fi
-	if [ -n "${Input_Modes[SelectedInputSource]}" ] ; then echo "            Input Mode = ${Input_Modes[SelectedInputSource]}" ; fi
-	if [ -n "${KeyboardLayout_Names[SelectedInputSource]}" ] ; then echo "            KeyboardLayout Name = ${KeyboardLayout_Names[SelectedInputSource]}" ; fi
-	echo "        }"
-	echo "    }"
-	if [ -n "${ResourceID}" ] ; then
-		echo "    AppleTimeResID = Dict {"
-		echo "        ${ScriptManager} = ${ResourceID}"
-		echo "    }"
-	fi
-	echo "}"
-	echo
-	if [ ${RemoteManagement} -eq 1 ] ; then
-		printf "\033[1m/Library/Preferences/com.apple.RemoteManagement.plist\033[m\n"
-		echo "Dict {"
-		echo "    ARD_AllLocalUsersPrivs = 1073742079"
-		echo "    ARD_AllLocalUsers = true"
-		echo "}"
-		echo
-	fi
-	if [ ${RemoteManagement} -eq 1 ] ; then
-		printf "\033[1m/etc/RemoteManagement.launchd\033[m\n"
-		echo "enabled"
-		echo
-	fi
-	printf "\033[1m/etc/ntp.conf\033[m\n"
-	echo "server ${NTPServer}"
-	echo
-	printf "\033[1m/var/db/.AppleSetupDone\033[m\n"
-	echo
-	printf "\033[1m/var/db/launchd.db/com.apple.launchd/overrides.plist\033[m\n"
-	echo "Dict {"
-	echo "    org.ntp.ntpd = Dict {"
-	if [ ${NTPEnabled} -eq 1 ] ; then
-		echo "        Disabled = false"
-	else
-		echo "        Disabled = true"
-	fi
-	echo "    }"
-	echo "    com.openssh.sshd = Dict {"
-	if [ ${RemoteLogin} -eq 1 ] ; then
-		echo "        Disabled = false"
-	else
-		echo "        Disabled = true"
-	fi
-	echo "    }"
-	echo "}"
-	echo
-	printf "\033[1m/var/log/CDIS.custom\033[m\n"
-	echo "LANGUAGE=${Localization}"
-	echo
-	if [ ${FirstBoot} -eq 1 ] ; then
-		printf "\033[1m${FirstBootPath}/FirstBoot.sh\033[m\n"
-		printf \#\!"/bin/sh\n"
-		echo "ScriptPath=\`dirname \"\${0}\"\`"
-		echo "IFS=\$'\\\n'"
-		echo "Actions=( \`ls \"\${ScriptPath}/Actions\" \` )"
-		echo "unset IFS"
-		echo "for Action in \"\${Actions[@]}\" ; do"
-		echo "	\"\${ScriptPath}/Actions/\${Action}\""
-		echo "done"
-		echo "srm \"/Library/LaunchDaemons/FirstBoot.plist\""
-		echo "rm -rf \"\${ScriptPath}\""
-		echo "exit 0"
-		echo
-	fi
-	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then
-		printf "\033[1m${FirstBootPath}/Actions/LocationServices.sh\033[m\n"
-		printf \#\!"/bin/sh\n"
-		echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then"
-		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c51-62 | awk {'print tolower()'}\`"
-		echo "else"
-		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-62\`"
-		echo "fi"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"ObsoleteDataDeleted\" -bool TRUE"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"LocationServicesEnabled\" -int 1"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.notbackedup.\${UUID}\" \"LocationServicesEnabled\" -int 1"
-		echo "chown -Rh 205:205 \"/private/var/db/locationd/Library/Preferences/ByHost\""
-		echo "exit 0"
-		echo
-	fi
-	if [ ${RemoteManagement} -eq 1 ] ; then
-		printf "\033[1m${FirstBootPath}/Actions/RemoteManagement.sh\033[m\n"
-		printf \#\!"/bin/sh\n"
-		echo "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all"
-		echo "exit 0"
-		echo
-	fi
-	press_anyKey
-}
+# Section: Packages
 
 function menu_Packages {
 	display_Subtitle "Function not Implemented"
 	sleep 2
 }
 
+# Section: Configurations
+
+function get_Configurations {
+	unset Configurations[@]
+	IFS=$'\n'
+	Configurations=( `find "${ConfigurationFolder}" -name "*.plist" -exec basename {} \; | awk -F ".plist" '{print $1}'` )
+	unset IFS
+}
+
+function get_Configuration {
+	Language="English"
+	SACountryCode="US"
+	InputSourceID="US"
+	LocationServices=0
+	NTPServerName="Apple Americas/U.S. (time.apple.com)"
+	NTPServer="time.apple.com"
+	NTPEnabled=1
+	GeonameID=5341145
+	TZAuto=0
+	RemoteLogin=0
+	RemoteManagement=0
+	if [ -n "${Configuration}" ] ; then
+		Language=`defaults read "${ConfigurationFolder}/${Configuration}" "Language" 2>/dev/null`
+		refresh_Language
+		SACountryCode=`defaults read "${ConfigurationFolder}/${Configuration}" "SACountryCode" 2>/dev/null`
+		refresh_Country
+		InputSourceID=`defaults read "${ConfigurationFolder}/${Configuration}" "InputSourceID" 2>/dev/null`
+		refresh_Keyboard
+		LocationServices=`defaults read "${ConfigurationFolder}/${Configuration}" "LocationServices" 2>/dev/null`
+		if [ ${?} -ne 0 ] ; then LocationServices=0 ; fi
+		NTPEnabled=`defaults read "${ConfigurationFolder}/${Configuration}" "NTPEnabled" 2>/dev/null`
+		if [ -z "${NTPEnabled}" ] ; then NTPEnabled=1 ; fi
+		NTPServer=`defaults read "${ConfigurationFolder}/${Configuration}" "NTPServer" 2>/dev/null`
+		if [ -z "${NTPServer}" ] ; then NTPServer="time.apple.com" ; fi
+		set_NTPServerName "${NTPServer}"
+		GeonameID=`defaults read "${ConfigurationFolder}/${Configuration}" "GeonameID" 2>/dev/null`
+		TZAuto=`defaults read "${ConfigurationFolder}/${Configuration}" "TZAuto" 2>/dev/null`
+		if [ -z "${TZAuto}" ] ; then TZAuto=0 ; fi
+		refresh_GeonameID
+		RemoteLogin=`defaults read "${ConfigurationFolder}/${Configuration}" "RemoteLogin" 2>/dev/null`
+		if [ ${?} -ne 0 ] ; then RemoteLogin=0 ; fi
+		RemoteManagement=`defaults read "${ConfigurationFolder}/${Configuration}" "RemoteManagement" 2>/dev/null`
+		if [ ${?} -ne 0 ] ; then RemoteManagement=0 ; fi
+	fi
+}
+
+function get_Users {
+	unset UserWarnings[@]
+	unset RealNames[@]
+	unset RecordNames[@]
+	unset Passwords[@]
+	unset AuthenticationHints[@]
+	unset UniqueIDs[@]
+	unset UserShells[@]
+	unset NFSHomeDirectories[@]
+	if [ -n "${Configuration}" ] ; then
+		i=0 ; while : ; do
+			realname=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:realname" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			if [ ${?} -ne 0 ] ; then break ; fi
+			UserWarnings[i]=0
+			update_RealName "${realname}"
+			if [ "${realname}" != "${RealName}" ] ; then UserWarnings[i]=1 ; fi
+			RealNames[i]="${RealName}"
+			name=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:name" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			update_RecordName "${name}"
+			if [ "${name}" != "${RecordName}" ] ; then UserWarnings[i]=1 ; fi
+			RecordNames[i]="${RecordName}"
+			Passwords[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:passwd" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			AuthenticationHints[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:hint" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			uid=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:uid" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			update_UniqueID "${uid}"
+			if [ ${uid} -ne ${UniqueID} ] ; then UserWarnings[i]=1 ; fi
+			UniqueIDs[i]=${UniqueID}
+			UserShells[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:shell" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			NFSHomeDirectories[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:home" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+			let i++
+		done
+	fi
+}
+
 function load_Configuration {
-	display_Subtitle "Function not Implemented"
-	sleep 2
+	display_Subtitle "Load Configuration"
+	get_Configurations
+	if [ ${#Configurations[@]} -eq 0 ] ; then
+		press_anyKey "No configurations available, please create a configuration first."
+		return 0
+	fi
+	Configurations=( "None" "${Configurations[@]}" )
+	display_Options "Configurations" "Select a configuration: "
+	select Configuration in "${Configurations[@]}" ; do
+		if [ -n "${Configuration}" ] ; then break ; fi
+	done
+	if [ "${Configuration}" == "None" ] ; then unset Configuration ; fi
+	get_Configuration
+	get_Users
 }
 
 function save_Configuration {
-	display_Subtitle "Function not Implemented"
-	sleep 2
+	unset ConfigurationName
+	unset Overwrite
+	display_Subtitle "Save Configuration"
+	while [ -z "${ConfigurationName}" ] ; do
+		printf "Configuration name" ; if [ -n "${Configuration}" ] ; then printf " (${Configuration})" ; fi ; printf ": "
+		read ConfigurationName
+		if [ -z "${ConfigurationName}" ] ; then ConfigurationName="${Configuration}" ; fi
+	done
+	if [ "${ConfigurationName}" != "${Configuration}" ] ; then
+		while [ -e "${ConfigurationFolder}/${Configuration}.plist" ] ; do
+			printf "\nA configuration already exists named \033[1m${ConfigurationName}\033[m.\n"
+			read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty ; echo
+			if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
+			case "${Overwrite}" in
+				"Y" | "y" ) echo ; break ;;
+				"N" | "n" ) echo ; return 0 ;;
+			esac
+		done
+	fi
+	Configuration="${ConfigurationName}"
+	defaults write "${ConfigurationFolder}/${Configuration}" "Language" -string "${Language}"
+	defaults write "${ConfigurationFolder}/${Configuration}" "SACountryCode" -string "${SACountryCode}"
+	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
+	defaults write "${ConfigurationFolder}/${Configuration}" "InputSourceID" -string "${InputSourceID}"
+	if [ ${LocationServices} -eq 1 ] ;then
+		defaults write "${ConfigurationFolder}/${Configuration}" "LocationServices" -bool TRUE
+	else
+		defaults write "${ConfigurationFolder}/${Configuration}" "LocationServices" -bool FALSE
+	fi
+	if [ ${NTPEnabled} -eq 1 ] ;then
+		defaults write "${ConfigurationFolder}/${Configuration}" "NTPEnabled" -bool TRUE
+	else
+		defaults write "${ConfigurationFolder}/${Configuration}" "NTPEnabled" -bool FALSE
+	fi
+	defaults write "${ConfigurationFolder}/${Configuration}" "NTPServer" -string "${NTPServer}"
+	defaults write "${ConfigurationFolder}/${Configuration}" "GeonameID" -int ${GeonameID}
+	if [ ${TZAuto} -eq 1 ] ;then
+		defaults write "${ConfigurationFolder}/${Configuration}" "TZAuto" -bool TRUE
+	else
+		defaults write "${ConfigurationFolder}/${Configuration}" "TZAuto" -bool FALSE
+	fi
+	if [ ${RemoteLogin} -eq 1 ] ;then
+		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteLogin" -bool TRUE
+	else
+		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteLogin" -bool FALSE
+	fi
+	if [ ${RemoteManagement} -eq 1 ] ;then
+		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteManagement" -bool TRUE
+	else
+		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteManagement" -bool FALSE
+	fi
+	defaults delete "${ConfigurationFolder}/${Configuration}" "Users" 2>/dev/null
+	/usr/libexec/PlistBuddy -c "Add :Users array" "${ConfigurationFolder}/${Configuration}.plist"
+	i=0 ; for Element in "${RealNames[@]}" ; do
+		/usr/libexec/PlistBuddy -c "Add :Users:${i} dict" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:realname string ${RealNames[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:name string ${RecordNames[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:passwd string ${Passwords[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:hint string ${AuthenticationHints[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:uid integer ${UniqueIDs[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:shell string ${UserShells[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		/usr/libexec/PlistBuddy -c "Add :Users:${i}:home string ${NFSHomeDirectories[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		let i++
+	done
 }
 
 function apply_Configuration {
@@ -5936,23 +5565,10 @@ get_LicenseStatus
 menu_License
 get_SystemOSVersion
 get_LocalUsers
-get_ConfigurationFolder
-get_LibraryFolder
-get_PackageFolder
-get_MasterFolder
-get_VolumeName
-get_ImageSize
+get_Preferences
 set_TargetProperties
-get_Language
 set_LanguageCountryCodes "${LanguageCode}"
 set_OtherCountryCodes
-get_CountryCode
-get_Keyboard
-get_LocationServices
-get_NTPSettings
-get_GeonameID
-get_RemoteLogin
-get_RemoteManagement
 main_Menu
 #display_Output
 
