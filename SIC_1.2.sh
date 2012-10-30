@@ -153,7 +153,7 @@ FirstBootPath="/usr/libexec/FirstBoot"
 scriptName=`basename "${0}"`
 
 # Version
-SICVersion="1.2rc11"
+SICVersion="1.2rc12"
 
 function display_Title {
 	# ${1}:	Title
@@ -1495,16 +1495,22 @@ function set_TimeZoneDisplayName {
 
 function set_GeoKitFramework {
 	if [ -n "${targDisk}" ] ; then
+		TargetOSMinor=`defaults read "/Volumes/${targDisk}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
 		GeoKitFramework="/Volumes/${targDisk}/System/Library/PrivateFrameworks/GeoKit.framework/Versions/A/Resources/world.geokit"
 	else
+		TargetOSMinor=`defaults read "/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
 		GeoKitFramework="/System/Library/PrivateFrameworks/GeoKit.framework/Versions/A/Resources/world.geokit"
 	fi
+	case ${TargetOSMinor} in
+		6 | 7 ) PLACES="ZGEOPLACE" ;;
+		8 ) PLACES="ZGEOKITPLACE" ;;
+	esac
 }
 
 function set_TimeZone {
 	# ${1}: GeonameID
 	set_GeoKitFramework
-	QUERY="select ZTIMEZONENAME from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${1};"
 	ZTIMEZONENAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'`
 	set_TimeZoneDisplayName "${ZTIMEZONENAME}"
 	TimeZone="${TimeZoneDisplayName}"
@@ -1513,11 +1519,11 @@ function set_TimeZone {
 function set_ClosestCity {
 	# ${1}: GeonameID
 	set_GeoKitFramework
-	QUERY="select ZNAME from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZNAME from ${PLACES} where ZGEONAMEID = ${1};"
 	ZNAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
-	QUERY="select ZREGIONALCODE from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${1};"
 	ZREGIONALCODE=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZREGIONALCODE = " | awk -F "ZREGIONALCODE = " '{print $NF}'`
-	QUERY="select ZCOUNTRY from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${1};"
 	ZCOUNTRY=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'`
 	QUERY="select ZNAME from ZGEOPLACENAME where ZEN > 0 and ZPLACE = ${ZCOUNTRY};"
 	ZCOUNTRYNAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
@@ -1531,13 +1537,13 @@ function set_ClosestCity {
 function set_TimeZoneList {
 	# ${1}: GeonameID
 	set_GeoKitFramework
-	QUERY="select ZCOUNTRY from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${1};"
 	ZCOUNTRY=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'`
-	QUERY="select ZTIMEZONENAME from ZGEOPLACE where ZGEONAMEID = ${1};"
+	QUERY="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${1};"
 	ZTIMEZONENAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'`
 	set_TimeZoneDisplayName "${ZTIMEZONENAME}"
 	TimeZoneList=( "${TimeZoneDisplayName}" )
-	QUERY="select distinct ZTIMEZONENAME from ZGEOPLACE where ZCOUNTRY = ${ZCOUNTRY};"
+	QUERY="select distinct ZTIMEZONENAME from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY};"
 	ZTIMEZONENAMES=( `sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'` )
 	i=0
 	for ZTIMEZONENAME in "${ZTIMEZONENAMES[@]}" ; do
@@ -1938,7 +1944,7 @@ function get_TimeZone {
 	if [ -z "${prefGeonameID}" ] ; then prefGeonameID=`/usr/libexec/PlistBuddy -c "Print ':com.apple.preferences.timezone.selected_city:GeonameID'" "/Library/Preferences/.GlobalPreferences.plist"` ; fi
 	if [ -n "${prefGeonameID}" ] ; then GeonameID=${prefGeonameID} ; fi
 	echo "GeonameID:		${GeonameID}"
-	QUERY="select ZCOUNTRY from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	ZCOUNTRY=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'`
 	set_CountryCode ${ZCOUNTRY}
 	set_TimeZone ${GeonameID}
@@ -1983,7 +1989,7 @@ function select_TimeZone {
 	set_TimeZoneNames "${TimeZone}"
 	i=0
 	for ZTIMEZONENAME in "${TimeZoneNames[@]}" ; do
-		QUERY="select distinct ZCOUNTRY from ZGEOPLACE where ZTIMEZONENAME = \"${ZTIMEZONENAME}\";"
+		QUERY="select distinct ZCOUNTRY from ${PLACES} where ZTIMEZONENAME = \"${ZTIMEZONENAME}\";"
 		RESULTS=( `sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'` )
 		for ZCOUNTRY in ${RESULTS} ; do
 			if [ ${i} -eq 0 ] ; then
@@ -2022,19 +2028,19 @@ function select_TimeZone {
 	fi
 	unset ZTIMEZONENAMES[@]
 	for TimeZoneName in "${TimeZoneNames[@]}" ; do
-		QUERY="select distinct ZTIMEZONENAME from ZGEOPLACE where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${TimeZoneName}\";"
+		QUERY="select distinct ZTIMEZONENAME from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${TimeZoneName}\";"
 		ZTIMEZONENAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'`
 		if [ -n "${ZTIMEZONENAME}" ] ; then ZTIMEZONENAMES=( "${ZTIMEZONENAMES[@]}" "${ZTIMEZONENAME}" ) ; fi
 	done
-	QUERY="select ZGEONAMEID from ZGEOPLACE where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${ZTIMEZONENAMES[0]}\";"
+	QUERY="select ZGEONAMEID from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${ZTIMEZONENAMES[0]}\";"
 	ZGEONAMEIDS=( `sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZGEONAMEID = " | awk -F "ZGEONAMEID = " '{print $NF}'` )
 	if [ ${#ZGEONAMEIDS[@]} -gt 1 ] ; then
 		unset ZNAMEREGIONALCODES[@]
 		i=0
 		for ZGEONAMEID in ${ZGEONAMEIDS[@]} ; do
-			QUERY="select ZNAME from ZGEOPLACE where ZGEONAMEID = ${ZGEONAMEID};"
+			QUERY="select ZNAME from ${PLACES} where ZGEONAMEID = ${ZGEONAMEID};"
 			ZNAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
-			QUERY="select ZREGIONALCODE from ZGEOPLACE where ZGEONAMEID = ${ZGEONAMEID};"
+			QUERY="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${ZGEONAMEID};"
 			ZREGIONALCODE=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZREGIONALCODE = " | awk -F "ZREGIONALCODE = " '{print $NF}'`
 			if [ -n "${ZREGIONALCODE}" ] ; then
 				ZNAMEREGIONALCODES[i]="${ZNAME}, ${ZREGIONALCODE}"
@@ -2051,15 +2057,15 @@ function select_TimeZone {
 			while [ "${ZNAMEREGIONALCODE}" == "Show All" ] ; do
 				i=1
 				while [ ${i} -lt ${#ZTIMEZONENAMES[@]} ] ; do
-					QUERY="select ZGEONAMEID from ZGEOPLACE where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${ZTIMEZONENAMES[i]}\";"
+					QUERY="select ZGEONAMEID from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY} and ZTIMEZONENAME = \"${ZTIMEZONENAMES[i]}\";"
 					ZGEONAMEIDS=( ${ZGEONAMEIDS[@]} `sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZGEONAMEID = " | awk -F "ZGEONAMEID = " '{print $NF}'` )
 					let i++
 				done
 				i=0
 				for ZGEONAMEID in ${ZGEONAMEIDS[@]} ; do
-					QUERY="select ZNAME from ZGEOPLACE where ZGEONAMEID = ${ZGEONAMEID};"
+					QUERY="select ZNAME from ${PLACES} where ZGEONAMEID = ${ZGEONAMEID};"
 					ZNAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
-					QUERY="select ZREGIONALCODE from ZGEOPLACE where ZGEONAMEID = ${ZGEONAMEID};"
+					QUERY="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${ZGEONAMEID};"
 					ZREGIONALCODE=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZREGIONALCODE = " | awk -F "ZREGIONALCODE = " '{print $NF}'`
 					if [ -n "${ZREGIONALCODE}" ] ; then
 						ZNAMEREGIONALCODES[i]="${ZNAME}, ${ZREGIONALCODE}"
@@ -2222,25 +2228,25 @@ function apply_GlobalPreferences {
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.AppleModemSettingTool.LastCountryCode' string '${CountryCode}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:CountryCode' string '${CountryCode}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:GeonameID' integer ${GeonameID}" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZLATITUDE from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZLATITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	Latitude=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZLATITUDE = " | awk -F "ZLATITUDE = " '{print $NF}'`
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:Latitude' real ${Latitude}" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZNAME from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZNAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	Name=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:LocalizedNames:en' string ${Name}" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZLONGITUDE from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZLONGITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	Longitude=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZLONGITUDE = " | awk -F "ZLONGITUDE = " '{print $NF}'`
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:Longitude' real ${Longitude}" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:Name' string '${Name}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZPOPULATION from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZPOPULATION from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	Population=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZPOPULATION = " | awk -F "ZPOPULATION = " '{print $NF}'`
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:Population' integer ${Population}" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZREGIONALCODE from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	RegionalCode=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZREGIONALCODE = " | awk -F "ZREGIONALCODE = " '{print $NF}'`
 	if [ -n "${RegionalCode}" ] ; then
 		/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:RegionalCode' string '${RegionalCode}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	fi
-	QUERY="select ZTIMEZONENAME from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	TimeZoneName=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'`
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.preferences.timezone.selected_city:TimeZoneName' string '${TimeZoneName}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	Version=1
@@ -2252,7 +2258,7 @@ function apply_GlobalPreferences {
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.TimeZonePref.Last_Selected_City:3' string '${TimeZoneName}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.TimeZonePref.Last_Selected_City:4' string '${Country}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
 	/usr/libexec/PlistBuddy -c "Add ':com.apple.TimeZonePref.Last_Selected_City:5' string '${Name}'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"
-	QUERY="select ZCOUNTRY from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	ZCOUNTRY=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'`
 	QUERY="select distinct ZNAME from ZGEOPLACENAME where ZEN > 0 and ZPLACE = ${ZCOUNTRY};"
 	ZNAME=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZNAME = " | awk -F "ZNAME = " '{print $NF}'`
@@ -2349,7 +2355,7 @@ function apply_SetupRegComplete {
 function apply_Localtime {
 	set_GeoKitFramework
 	echo "Updating \033[1mlocaltime\033[m..."
-	QUERY="select ZTIMEZONENAME from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	TimeZoneName=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZTIMEZONENAME = " | awk -F "ZTIMEZONENAME = " '{print $NF}'`
 	ln -fs "/usr/share/zoneinfo/${TimeZoneName}" "/Volumes/${targDisk}/etc/localtime"
 }
@@ -3268,7 +3274,7 @@ function get_ImageConfiguration {
 	set_NTPServerName "${NTPServer}"
 	TimezoneAuto=`/usr/libexec/PlistBuddy -c "Print ':Active'" "/Volumes/${targDisk}/Library/Preferences/com.apple.timezone.auto.plist" 2>/dev/null`
 	GeonameID=`/usr/libexec/PlistBuddy -c "Print ':com.apple.preferences.timezone.selected_city:GeonameID'" "/Volumes/${targDisk}/Library/Preferences/.GlobalPreferences.plist"`
-	QUERY="select ZCOUNTRY from ZGEOPLACE where ZGEONAMEID = ${GeonameID};"
+	QUERY="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 	ZCOUNTRY=`sqlite3 -line "${GeoKitFramework}" "${QUERY}" | grep "ZCOUNTRY = " | awk -F "ZCOUNTRY = " '{print $NF}'`
 	set_CountryCode ${ZCOUNTRY}
 	set_TimeZone ${GeonameID}
