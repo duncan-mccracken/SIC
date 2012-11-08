@@ -1,10 +1,5 @@
 #!/bin/sh
 
-function not_Implemented {
-	display_Subtitle "Function not Implemented"
-	sleep 2
-}
-
 # Default Base Folder
 BaseFolder="/Users/Shared/SIC"
 # Default Configurations Folder
@@ -44,7 +39,7 @@ RemoteManagement=0
 ComputerName="Model and MAC Address"
 
 # Version
-SICVersion="1.5a5"
+SICVersion="1.5b4"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -180,6 +175,132 @@ function menu_License {
 }
 
 # Section: Help
+
+function help_Preferences {
+	display_Subtitle "Preferences"
+	echo "Default Folders: The locations in which SIC stores things."
+	echo
+	echo "Configurations: Plists that contain all of your settings for an image."
+	echo
+	echo "Library: 'Vanilla' system images, configurations are applied to these to create"
+	echo "your masters."
+	echo
+	echo "Packages: If you want to add software to your image, place OS X installer"
+	echo "packages in this folder."
+	echo
+	echo "Masters: Where SIC exports the restore-ready images."
+	echo
+	echo "Image Settings: Set the default image size & volume name."
+	echo
+	echo "Export Settings: Allows you to select the default export behaviours for"
+	echo "masters. Splitting the recovery partition away from the image is the default"
+	echo "behaviour for DeployStudio."
+	echo
+	press_anyKey
+}
+
+function help_Creating {
+	display_Subtitle "Creating Images"
+	echo "SIC will create images from two sources:"
+	echo " - An un-booted, un-configured system volume attached to your computer."
+	echo " - An OS X install ESD or DVD."
+	echo
+	echo "These images will be saved to SIC's Library. These images are un-configured"
+	echo "and used to create masters by applying configuration(s) to them."
+	echo
+	echo "Once a version of OS X is in the library, you don't need to capture/install"
+	echo "that version again."
+	echo
+	echo "Note: When performing an installation, you will only be able to select an"
+	echo "      installer of the same version of OS X your are running."
+	echo "      eg. If you are running Mountain Lion, you can only perform Mountain Lion"
+	echo "          installations."
+	echo
+	press_anyKey
+}
+
+function help_Configuring {
+	display_Subtitle "Configuring Images"
+	echo "The System Setup section will allow you to configure the system settings you"
+	echo "wish to apply to your image(s). If you have an un-configured system attached to"
+	echo "your computer, you may also apply your system settings to this volume allowing"
+	echo "you to use SIC for a 'No-Imaging' workflow."
+	echo
+	echo "Select Target: Allows you to choose an image from the Library, or an attached"
+	echo "volume to configure. You don't need to select a target to create a"
+	echo "configuration, but you must have a target selected to apply a configuration."
+	echo
+	echo "Configurations: Files which contain the settings which you wish to apply to"
+	echo "un-configured images/volumes. You may apply a configuration to multiple OS X"
+	echo "versions, but remember to check your settings are being displayed correctly in"
+	echo "each section, particularly System Preferences."
+	echo
+	echo "System Preferences: This simply creates the settings achieved by running the"
+	echo "Setup Assistant at 1st boot. There are a few additional options, which are"
+	echo "helpful when creating images for mass-deployment"
+	echo
+	echo "Users: Create and edit User Accounts on your image."
+	echo
+	echo "Packages: Allows you to select packages to install software on your image."
+	echo "If the package is unable to be installed, it will be copied to the image and"
+	echo "installation attempted on first boot."
+	echo
+	echo "Remove Software: To reduce your image size, particularly when creating an image"
+	echo "of a new (factory) system, you may want to remove some of the pre-installed"
+	echo "software."
+	echo
+	press_anyKey
+	display_Subtitle "Configuring Images"
+	echo "Apply Configuration: This will export a master image or configure an attached"
+	echo "volume, with the settings displayed in the previous sections."
+	echo
+	echo "Note: Applying a configuration is non-destructive to images in your Library"
+	echo "      the configured image will be exported to the Masters folder, ready for"
+	echo "      restore."
+	echo
+	echo "Note: Applying a configuration to a volume will cause SIC to ignore it once"
+	echo "      the configuration is complete, the volume is seen as a configured"
+	echo "      system which SIC can do nothing with."
+	echo
+	press_anyKey
+}
+
+function menu_Help {
+	HelpOptions=( "Main Menu" "Preferences" "Creating Images" "Configuring Images" )
+	while [ "${Option}" != "Main Menu" ] ; do
+		display_Subtitle "Help"
+		echo "SIC is a tool to assist with the creation of OS X images for mass deployment."
+		echo
+		echo "The workflow is designed to prevent the need to create everything from scratch"
+		echo "when a new version of OS X is released. Additionally, once a build of OS X is"
+		echo "captured it can be re-used to create multiple images, without the need to"
+		echo "re-install the base operating system."
+		echo
+		echo "The simplest possible workflow for SIC is:"
+		echo " - Mount your OS X installer (or insert disc)"
+		echo " - Select Create Image"
+		echo " - Follow the prompts (Once this is captured, you may use it as many times as"
+		echo "   you wish)"
+		echo " - Return to the Main Menu, select System Setup"
+		echo " - Select your Target (the image you just created)"
+		echo " - Set your System Preferences"
+		echo " - Create your User(s)"
+		echo " - Apply your Configuration"
+		echo
+		echo "For detailed information, select from the options below."
+		echo
+		display_Options "Options" "Select an option: "
+		select Option in "${HelpOptions[@]}" ; do
+			case "${Option}" in
+				"Main Menu" ) break ;;
+				"Preferences" ) help_Preferences ; unset Option ; break ;;
+				"Creating Images" ) help_Creating ; unset Option ; break ;;
+				"Configuring Images" ) help_Configuring ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
 
 # Section: Preferences
 
@@ -730,10 +851,8 @@ function install_Package {
 				fi
 				Previous="${Line}"
 			done
-			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-				press_anyKey
-			fi
 		fi
+		echo
 	else
 		press_anyKey "The package selection is invalid, please review your settings."
 	fi
@@ -786,6 +905,9 @@ function create_Image {
 				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${Target}" ${InstallType}
 			else
 				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${Target}" 0
+			fi
+			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
+				press_anyKey
 			fi
 			bless --folder "${Target}/System/Library/CoreServices" --bootefi 2>/dev/null
 			touch "${Target}/private/var/db/.RunLanguageChooserToo"
@@ -5857,18 +5979,30 @@ function apply_Configuration {
 	fi
 	if [ ${TargetType} -eq 2 ] ; then
 		if [ -e "${LibraryFolder}/${TargetName}.shadow" ] ; then rm -f "${LibraryFolder}/${TargetName}.shadow" ; fi
-		ExportName="${TargetName//.dmg/.i386.hfs.dmg}"
-		RecoveryName="${TargetName//.dmg/.i386.recovery.dmg}"
-		while [ -e "${MasterFolder}/${ExportName}" ] ; do
-			printf "An image named \033[1m${ExportName}\033[m already exists.\n"
-			read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty
-			echo
-			if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
-			case "${Overwrite}" in
-				"Y" | "y" ) echo ; break ;;
-				"N" | "n" ) return 0 ;;
-			esac
-		done
+		ExportName="${TargetName//.dmg/}"
+		if [ -n "${Configuration}" ] ; then ExportName="${ExportName}-${Configuration}" ; fi
+		MasterName="${ExportName}.i386.hfs.dmg"
+		RecoveryName="${ExportName}.i386.recovery.dmg"
+		# Begin: Debug Output
+		# echo "TargetName:	${TargetName}"
+		# echo "MasterName:	${MasterName}"
+		# echo "RecoveryName:	${RecoveryName}"
+		# echo
+		# End: Debug Output
+		if [ -e "${MasterFolder}/${MasterName}" ] ; then
+			unset Overwrite
+			while [ -n "${Overwrite}" ] ; do
+				printf "An image named \033[1m${MasterName}\033[m already exists.\n"
+				read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty
+				echo
+				if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
+				case "${Overwrite}" in
+					"Y" | "y" ) echo ; break ;;
+					"N" | "n" ) return 0 ;;
+					* ) unset Overwrite ;;
+				esac
+			done
+		fi
 		hdiutil eject "${Target}" &>/dev/null
 		IFS=$'\n'
 		TargetVolumes=( `hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" -shadow | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
@@ -6406,7 +6540,7 @@ function apply_Configuration {
 		let i++
 	done
 	if [ ${#Packages[@]} -gt 0 ] ; then
-		printf "Installing packages\n"
+		printf "Installing Packages\n"
 		for Package in "${Packages[@]}" ; do
 			find "${PackageFolder}" -name "${Package}" -a \! -path "*pkg/*" | while read PackagePath ; do
 				IFS=$'\n'
@@ -6601,8 +6735,8 @@ function apply_Configuration {
 		set_TargetProperties
 	fi
 	if [ ${TargetType} -eq 2 ] ; then
-		printf "Exporting image(s)\n"
-		if [ -e "${MasterFolder}/${ExportName}" ] ; then rm -f "${MasterFolder}/${ExportName}" ; fi
+		printf "Exporting Image(s)\n"
+		if [ -e "${MasterFolder}/${MasterName}" ] ; then rm -f "${MasterFolder}/${MasterName}" ; fi
 		if [ -e "${MasterFolder}/${RecoveryName}" ] ; then rm -f "${MasterFolder}/${RecoveryName}" ; fi
 		for TargetVolume in "${TargetVolumes[@]}" ; do
 			rm -rf "/Volumes/${TargetVolume}/.Spotlight-V100"
@@ -6612,15 +6746,15 @@ function apply_Configuration {
 		case ${ExportType} in
 			1 )
 				hdiutil eject "${Target}" &>/dev/null ;
-				hdiutil convert -format UDZO "${LibraryFolder}/${TargetName}" -shadow "${LibraryFolder}/${TargetName}.shadow" -o "${MasterFolder}/${ExportName}" ;;
+				hdiutil convert -format UDZO "${LibraryFolder}/${TargetName}" -shadow "${LibraryFolder}/${TargetName}.shadow" -o "${MasterFolder}/${MasterName}" ;;
 			2 )
-				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${ExportName}" ;
+				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${MasterName}" ;
 				hdiutil eject "${Target}" &>/dev/null ;;
 			3 )
 				printf "Initializing…\n"
 				printf "Creating…\n"
 				printf "copying \"${Target}\"."
-				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${ExportName}" ;
+				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${MasterName}" ;
 				if [ ${#TargetVolumes[@]} -gt 1 ] ; then
 					TargetDevice=`diskutil info "${Target}" | grep -m 1 "Part of Whole:" | awk '{print $NF}'` ;
 					hdiutil unmount "/dev/${TargetDevice}s3" &>/dev/null
@@ -6629,8 +6763,8 @@ function apply_Configuration {
 				hdiutil eject "${Target}" &>/dev/null ;;
 		esac
 		printf "\n"
-		printf "Scanning image(s) for restore\n"
-		asr imagescan --source "${MasterFolder}/${ExportName}"
+		printf "Scanning Image(s) for Restore\n"
+		asr imagescan --source "${MasterFolder}/${MasterName}"
 		if [ -e "${MasterFolder}/${RecoveryName}" ] ; then asr imagescan --source "${MasterFolder}/${RecoveryName}" ; fi
 		rm -f "${LibraryFolder}/${TargetName}.shadow"
 		Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'`
@@ -6673,7 +6807,7 @@ function main_Menu {
 		select Option in "${Options[@]}" ; do
 			case "${Option}" in
 				"Exit" ) echo ; exit 0 ;;
-				"Help" ) not_Implemented ; unset Option ; break ;;
+				"Help" ) menu_Help ; unset Option ; break ;;
 				"Preferences" ) menu_Preferences ; unset Option ; break ;;
 				"Create Image" ) menu_CreateImage ; unset Option ; break ;;
 				"System Setup" ) menu_SystemSetup ; unset Option ; break ;;
