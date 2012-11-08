@@ -41,9 +41,10 @@ GeonameID=5341145
 TZAuto=0
 RemoteLogin=0
 RemoteManagement=0
+ComputerName="Model and MAC Address"
 
 # Version
-SICVersion="1.5a4"
+SICVersion="1.5a5"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -112,6 +113,16 @@ function get_LocalUsers {
 		let i++
 		fi
 	done
+}
+
+function set_Target {
+	# ${1}: Volume
+	if [ -n "${1}" ] ; then
+		Target="/Volumes/${1}"
+	else
+		unset Target
+		TargetType=0
+	fi
 }
 
 # Section: License & Copyright
@@ -563,6 +574,8 @@ function get_Preferences {
 	get_MasterFolder
 	get_VolumeName
 	get_ImageSize
+	get_ExportType
+	get_ScanImage
 }
 
 function menu_Preferences {
@@ -676,31 +689,16 @@ function select_Source {
 
 function install_Package {
 	# ${1}: Path to package
-	# ${2}: Installation volume
+	# ${2}: Installation target
+	# ${3}: InstallType
 	unset allowUntrusted
-	if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] || [ ${SystemOSMinor} -gt 7 ] ; then allowUntrusted="-allowUntrusted" ; fi
+	if [ ${SystemOSMinor} -eq 7 -a ${SystemOSPoint} -gt 3 ] || [ ${SystemOSMinor} -gt 7 ] ; then GateKeeper="-allowUntrusted" ; fi
 	if [ -e "${1}" ] ; then
-		if [ "${1}" == "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-			InstallType=0
-		else
-			while [ -z "${Customize}" ] ; do
-				echo
-				read -sn 1 -p "Customize Installation (y/N)? " Customize < /dev/tty
-				if [ -z "${Customize}" ] ; then Customize="n" ; fi ; echo
-				case "${Customize}" in
-					"Y" | "y" ) InstallType=1 ; break ;;
-					"N" | "n" ) InstallType=0 ; break ;;
-					* ) Customize="" ;;
-				esac
-				echo
-			done
-		fi
-		Customize=""
 		IFS=$'\n'
 		PackageTitles=( `installer -pkginfo -pkg "${1}"` )
 		unset IFS
 		s=1
-		if [ ${InstallType} -eq 1 ] ; then
+		if [ ${3} -eq 1 ] ; then
 			printf "\ninstaller: Package name is ${PackageTitles[0]}\n"
 			open "${1}"
 			printf "installer:PHASE:Waiting for installation to complete…\n"
@@ -712,7 +710,7 @@ function install_Package {
 			unset Previous
 			unset InstallerStatus
 			unset InstallerProgress
-			installer -verboseR "${allowUntrusted}" -pkg "${1}" -target "/Volumes/${2}" 2>/dev/null | while read Line ; do
+			installer -verboseR "${GateKeeper}" -pkg "${1}" -target "${2}" 2>/dev/null | while read Line ; do
 				if echo "${Line}" | grep -q "installer: " ; then printf "${Line}\n" ; fi
 				if echo "${Line}" | grep -q "\(installer:PHASE:\|installer:STATUS:\)" ; then
 					if [ "${InstallerStatus}" != "${Line}" ] ; then
@@ -757,7 +755,7 @@ function create_Image {
 			"N" | "n" ) echo ; break ;;
 		esac
 	done
-	Overwrite=""
+	unset Overwrite
 	if [ ! -e "${LibraryFolder}/${ImageName}.dmg" ] ; then
 		Removables=(
 			".Spotlight-V100"
@@ -768,20 +766,33 @@ function create_Image {
 		if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
 			rm -f "/tmp/${ImageName}.sparseimage" &>/dev/null
 			hdiutil create -size "${ImageSize}g" -type SPARSE -fs HFS+J -volname "${VolumeName}" "/tmp/${ImageName}.sparseimage"
-			InstallTarget=`hdiutil attach -owners on -noverify "/tmp/${ImageName}.sparseimage" | grep "/Volumes/${VolumeName}" | awk -F "/Volumes/" '{print $NF}'`
-			chown 0:80 "/Volumes/${InstallTarget}"
-			chmod 1775 "/Volumes/${InstallTarget}"
+			Volume=`hdiutil attach -owners on -noverify "/tmp/${ImageName}.sparseimage" | grep "/Volumes/${VolumeName}" | awk -F "/Volumes/" '{print $NF}'`
+			set_Target "${Volume}"
+			chown 0:80 "${Target}"
+			chmod 1775 "${Target}"
 			if [ -e "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" ] ; then
-				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${InstallTarget}"
+				unset Customize
+				while [ -z "${Customize}" ] ; do
+					echo
+					read -sn 1 -p "Customize Installation (y/N)? " Customize < /dev/tty
+					if [ -z "${Customize}" ] ; then Customize="n" ; fi ; echo
+					case "${Customize}" in
+						"Y" | "y" ) InstallType=1 ; break ;;
+						"N" | "n" ) InstallType=0 ; break ;;
+						* ) unset Customize ;;
+					esac
+					echo
+				done
+				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${Target}" ${InstallType}
 			else
-				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${InstallTarget}"
+				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${Target}" 0
 			fi
-			bless --folder "/Volumes/${InstallTarget}/System/Library/CoreServices" --bootefi 2>/dev/null
-			touch "/Volumes/${InstallTarget}/private/var/db/.RunLanguageChooserToo"
+			bless --folder "${Target}/System/Library/CoreServices" --bootefi 2>/dev/null
+			touch "${Target}/private/var/db/.RunLanguageChooserToo"
 			for Removable in "${Removables[@]}" ; do
-				if [ -e "/Volumes/${InstallTarget}/${Removable}" ] ; then rm -rf "/Volumes/${InstallTarget}/${Removable}" ; fi
+				if [ -e "${Target}/${Removable}" ] ; then rm -rf "${Target}/${Removable}" ; fi
 			done
-			Device=`diskutil info "/Volumes/${InstallTarget}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			Device=`diskutil info "${Target}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
 			diskutil unmountDisk force "/dev/${Device}" &>/dev/null
 			printf "Unmount of all volumes on ${Device} was successful\n"
 			diskutil eject "/dev/${Device}" &>/dev/null
@@ -886,16 +897,6 @@ function get_Targets {
 	done
 }
 
-function set_Target {
-	# ${1}: Volume
-	if [ -n "${1}" ] ; then
-		Target="/Volumes/${1}"
-	else
-		unset Target
-		TargetType=0
-	fi
-}
-
 function set_TargetOSVersion {
 	TargetOSMajor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $1}'`
 	TargetOSMinor=`defaults read "${Target}/System/Library/CoreServices/SystemVersion" "ProductVersion" | awk -F "." '{print $2}'`
@@ -937,6 +938,7 @@ function display_Target {
 }
 
 function select_Target {
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" &>/dev/null ; fi
 	get_Targets
 	display_Subtitle "Select Target"
 	display_Target
@@ -956,7 +958,6 @@ function select_Target {
 	if [ ${TargetType} -eq 1 ] ; then Volume="${TargetName}" ; fi
 	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; fi
 	set_TargetProperties "${Volume}"
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 }
 
 # Section: Language
@@ -4249,7 +4250,7 @@ function set_CountryTimeZones {
 			ZCOUNTRY=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
 		fi
 		Query="select distinct ZTIMEZONENAME from ${PLACES} where ZCOUNTRY = ${ZCOUNTRY};"
-		CountryTZFiles=( `sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null` )		
+		CountryTZFiles=( `sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null` )
 	fi
 	unset CountryTimeZones[@]
 	for TZFILE in "${CountryTZFiles[@]}" ; do
@@ -4849,6 +4850,22 @@ function select_RemoteManagement {
 	unset EnableARD
 }
 
+function display_ComputerName {
+	printf "Computer Name:		${ComputerName}\n\n"
+}
+
+function select_ComputerName {
+	ComputerNames=( "Model and MAC Address" "Serial Number" )
+	display_Subtitle "Computer Name"
+	display_ComputerName
+	display_Options "Naming conventions" "Select the naming convention you wish to use: "
+	select newComputerName in "${ComputerNames[@]}" ; do
+		if [ -n "${newComputerName}" ] ; then break ; fi
+	done
+	ComputerName="${newComputerName}"
+	unset newComputerName
+}
+
 function display_SystemSettings {
 	display_Language
 	display_CountryName
@@ -4858,10 +4875,10 @@ function display_SystemSettings {
 	display_TimeZone
 	display_RemoteLogin
 	display_RemoteManagement
+	display_ComputerName
 }
 
 function menu_SystemPreferences {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	SystemOptions=( "System Setup Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
 	while [ "${Option}" != "System Setup Menu" ] ; do
 		display_Subtitle "System Preferences"
@@ -4878,11 +4895,10 @@ function menu_SystemPreferences {
 				"Time Zone" ) select_TimeZone ; unset Option ; break ;;
 				"Remote Login" ) select_RemoteLogin ; unset Option ; break ;;
 				"Remote Management" ) select_RemoteManagement ; unset Option ; break ;;
-				"Computer Name" ) not_Implemented ; unset Option ; break ;;
+				"Computer Name" ) select_ComputerName ; unset Option ; break ;;
 			esac
 		done
 	done
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	unset Option
 }
 
@@ -5303,7 +5319,6 @@ function display_Users {
 }
 
 function menu_AddUser {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	unset AccountType
 	unset RealName
 	unset RecordName
@@ -5332,7 +5347,6 @@ function menu_AddUser {
 	update_NFSHomeDirectory
 	select_UserShell
 	set_NFSHomeDirectory
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	AccountTypes=( "${AccountTypes[@]}" "${AccountType}" )
 	RealNames=( "${RealNames[@]}" "${RealName}" )
 	RecordNames=( "${RecordNames[@]}" "${RecordName}" )
@@ -5344,7 +5358,6 @@ function menu_AddUser {
 }
 
 function menu_EditUser {
-	if [ ${TargetType} -eq 2 ] ; then Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'` ; set_TargetProperties "${Volume}" ; fi
 	display_Subtitle "Edit User"
 	if [ ${#RealNames[@]} -eq 0 ] ; then
 		press_anyKey "No users available, please create a user first."
@@ -5386,7 +5399,6 @@ function menu_EditUser {
 			esac
 		done
 	done
-	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" ; fi
 	unset Option
 	AccountTypes=( "${AccountTypes[@]}" "${AccountType}" )
 	RealNames=( "${RealNames[@]}" "${RealName}" )
@@ -5420,13 +5432,21 @@ function menu_DeleteUser {
 		if [ -z "${ConfirmDelete}" ] ; then ConfirmDelete="y" ; fi
 		echo
 		case "${ConfirmDelete}" in
-			"Y" | "y" ) unset RealNames[i] ; unset RecordNames[i] ; unset Passwords[i] ; unset AuthenticationHints[i] ; unset UniqueIDs[i] ; unset UserShells[i] ; unset NFSHomeDirectories[i] ; echo ;;
+			"Y" | "y" ) unset AccountTypes[i] ; unset RealNames[i] ; unset RecordNames[i] ; unset Passwords[i] ; unset AuthenticationHints[i] ; unset UniqueIDs[i] ; unset UserShells[i] ; unset NFSHomeDirectories[i] ; echo ;;
 			"N" | "n" ) echo ;;
 			* ) echo ; unset ConfirmDelete ;;
 		esac
 	done
 	unset ConfirmDelete
 	unset RealName
+	AccountTypes=( "${AccountTypes[@]}" )
+	RealNames=( "${RealNames[@]}" )
+	RecordNames=( "${RecordNames[@]}" )
+	Passwords=( "${Passwords[@]}" )
+	AuthenticationHints=( "${AuthenticationHints[@]}" )
+	UniqueIDs=( ${UniqueIDs[@]} )
+	UserShells=( "${UserShells[@]}" )
+	NFSHomeDirectories=( "${NFSHomeDirectories[@]}" )
 	check_AccountTypes
 }
 
@@ -5450,9 +5470,176 @@ function menu_Users {
 
 # Section: Packages
 
+function detect_AvailablePackages {
+	unset AvailablePackages[@]
+	IFS=$'\n'
+	AvailablePackages=( `find "${PackageFolder}" -name "*pkg" -a \! -path "*pkg/*" -exec basename {} \;` )
+	unset IFS
+}
+
+function display_Packages {
+	printf "Packages:	"
+	if [ -n "${Packages[0]}" ] ; then printf "${Packages[0]}" ; else printf "-" ; fi
+	printf "\n"
+	i=1 ; while [ ${i} -lt ${#Packages[@]} ] ; do
+		printf "		${Packages[i]}\n"
+		let i++
+	done
+	printf "\n"
+}
+
+function select_Package {
+	unset Package
+	display_Subtitle "Select Package"
+	display_Packages
+	detect_AvailablePackages
+	i=0 ; for AvailablePackage in "${AvailablePackages[@]}" ; do
+		for Element in "${Packages[@]}" ; do
+			if [ "${Element}" == "${AvailablePackage}" ] ; then unset AvailablePackages[i] ; break ; fi
+		done
+		let i++
+	done
+	if [ ${#AvailablePackages[@]} -eq 0 ] ; then
+		press_anyKey "No packages available."
+		unset Packages[@]
+	else
+		display_Options "Packages" "Select a package: "
+		select Package in "${AvailablePackages[@]}" ; do
+			if [ -n "${Package}" ] ; then break ; fi
+		done
+		Packages=( "${Packages[@]}" "${Package}" )
+	fi
+}
+
+function remove_Package {
+	unset Package
+	display_Subtitle "Remove Package"
+	if [ ${#Packages[@]} -eq 0 ] ; then
+		press_anyKey "No packages available, please select a package first."
+		return 0
+	fi
+	select Package in "${Packages[@]}" ; do
+		if [ -n "${Package}" ] ; then break ; fi
+	done
+	i=0 ; for Element in "${Packages[@]}" ; do
+		if [ "${Element}" == "${Package}" ] ; then unset Packages[i] ; break ; fi
+		let i++
+	done
+	Packages=( "${Packages[@]}" )
+}
+
 function menu_Packages {
-	display_Subtitle "Function not Implemented"
-	sleep 2
+	PackageOptions=( "System Setup Menu" "Add Package" "Remove Package" )
+	while [ "${Option}" != "System Setup Menu" ] ; do
+		display_Subtitle "Packages"
+		display_Packages
+		display_Options "Options" "Select an option: "
+		select Option in "${PackageOptions[@]}" ; do
+			case "${Option}" in
+				"System Setup Menu" ) break ;;
+				"Add Package" ) select_Package ; unset Option ; break ;;
+				"Remove Package" ) remove_Package ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
+}
+
+# Section: Remove Software
+
+function detect_RemovableItems {
+	unset AvailableRemovableItems[@]
+	if [ -e "${Target}/Applications/iPhoto.app" ] ; then AvailableRemovableItems=( "iPhoto" ) ; fi
+	if [ -e "${Target}/Applications/iMovie.app" ] ; then AvailableRemovableItems=( "${AvailableRemovableItems[@]}" "iMovie" ) ; fi
+	if [ -e "${Target}/Applications/iDVD.app" ] ; then AvailableRemovableItems=( "${AvailableRemovableItems[@]}" "iDVD" ) ; fi
+	if [ -e "${Target}/Applications/GarageBand.app" ] ; then AvailableRemovableItems=( "${AvailableRemovableItems[@]}" "GarageBand" ) ; fi
+	if [ -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] ; then AvailableRemovableItems=( "${AvailableRemovableItems[@]}" "Sounds & Jingles" ) ; fi
+	if [ -e "${Target}/Applications/iWeb.app" ] ; then AvailableRemovableItems=( "${AvailableRemovableItems[@]}" "iWeb" ) ; fi
+	i=0 ; for Item in "${AvailableRemovableItems[@]}" ; do
+		for Element in "${RemovableItems[@]}" ; do
+			if [ "${Item}" == "${Element}" ] ; then unset AvailableRemovableItems[i] ; break ; fi
+		done
+		let i++
+	done
+	AvailableRemovableItems=( "${AvailableRemovableItems[@]}" )
+}
+
+function display_RemovableItems {
+	printf "Remove:		"
+	if [ -n "${RemovableItems[0]}" ] ; then printf "${RemovableItems[0]}" ; else printf "-" ; fi
+	printf "\n"
+	i=1 ; while [ ${i} -lt ${#RemovableItems[@]} ] ; do
+		printf "		${RemovableItems[i]}\n"
+		let i++
+	done
+	printf "\n"
+}
+
+function select_Removable {
+	unset Removable
+	display_Subtitle "Select Software to Remove"
+	display_RemovableItems
+	detect_RemovableItems
+	if [ ${#AvailableRemovableItems[@]} -eq 0 ] ; then
+		press_anyKey "No software available to remove."
+	else
+		if [ ${#AvailableRemovableItems[@]} -gt 1 ] ; then
+			AvailableRemovableItems=( "Select All" "${AvailableRemovableItems[@]}" )
+		fi
+		display_Options "Software" "Select software to remove: "
+		select Removable in "${AvailableRemovableItems[@]}" ; do
+			if [ -n "${Removable}" ] ; then break ; fi
+		done
+		if [ "${Removable}" == "Select All" ] ; then
+			unset AvailableRemovableItems[0]
+			RemovableItems=( "${RemovableItems[@]}" "${AvailableRemovableItems[@]}" )
+		else
+			RemovableItems=( "${RemovableItems[@]}" "${Removable}" )
+		fi
+	fi
+}
+
+function deselect_Removable {
+	unset Removable
+	display_Subtitle "De-select Software to Remove"
+	if [ ${#RemovableItems[@]} -eq 0 ] ; then
+		press_anyKey "No software selected for removal."
+		return 0
+	fi
+	if [ ${#RemovableItems[@]} -gt 1 ] ; then
+		SelectedRemovableItems=( "Select All" "${RemovableItems[@]}" )
+	else
+		SelectedRemovableItems=( "${RemovableItems[@]}" )
+	fi
+	select Removable in "${SelectedRemovableItems[@]}" ; do
+		if [ -n "${Removable}" ] ; then break ; fi
+	done
+	if [ "${Removable}" == "Select All" ] ; then
+		unset RemovableItems[@]
+	else
+		i=0 ; for Element in "${RemovableItems[@]}" ; do
+			if [ "${Element}" == "${Removable}" ] ; then unset RemovableItems[i] ; break ; fi
+			let i++
+		done
+		RemovableItems=( "${RemovableItems[@]}" )
+	fi
+}
+
+function menu_RemoveSoftware {
+	RemoveOptions=( "System Setup Menu" "Select Item" "De-select Item" )
+	while [ "${Option}" != "System Setup Menu" ] ; do
+		display_Subtitle "Remove Software"
+		display_RemovableItems
+		display_Options "Options" "Select an option: "
+		select Option in "${RemoveOptions[@]}" ; do
+			case "${Option}" in
+				"System Setup Menu" ) break ;;
+				"Select Item" ) select_Removable ; unset Option ; break ;;
+				"De-select Item" ) deselect_Removable ; unset Option ; break ;;
+			esac
+		done
+	done
+	unset Option
 }
 
 # Section: Configurations
@@ -5489,6 +5676,7 @@ function new_Configuration {
 	unset UniqueIDs[@]
 	unset UserShells[@]
 	unset NFSHomeDirectories[@]
+	unset Packages[@]
 }
 
 function load_Configuration {
@@ -5523,6 +5711,8 @@ function load_Configuration {
 	if [ ${?} -ne 0 ] ; then RemoteLogin=0 ; fi
 	RemoteManagement=`defaults read "${ConfigurationFolder}/${Configuration}" "RemoteManagement" 2>/dev/null`
 	if [ ${?} -ne 0 ] ; then RemoteManagement=0 ; fi
+	ComputerName=`defaults read "${ConfigurationFolder}/${Configuration}" "ComputerName" 2>/dev/null`
+	if [ ${?} -ne 0 ] ; then ComputerName="Model and MAC Address" ; fi
 	unset UserWarnings[@]
 	unset AccountTypes[@]
 	unset RealNames[@]
@@ -5553,6 +5743,13 @@ function load_Configuration {
 		UniqueIDs[i]=${UniqueID}
 		UserShells[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:shell" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
 		NFSHomeDirectories[i]=`/usr/libexec/PlistBuddy -c "Print :Users:${i}:home" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+		let i++
+	done
+	unset Packages[@]
+	i=0 ; while : ; do
+		Package=`/usr/libexec/PlistBuddy -c "Print :Packages:${i}" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+		if [ ${?} -ne 0 ] ; then break ; fi
+		Packages[i]="${Package}"
 		let i++
 	done
 }
@@ -5609,6 +5806,7 @@ function save_Configuration {
 	else
 		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteManagement" -bool FALSE
 	fi
+	defaults write "${ConfigurationFolder}/${Configuration}" "ComputerName" -string "${ComputerName}"
 	defaults delete "${ConfigurationFolder}/${Configuration}" "Users" 2>/dev/null
 	/usr/libexec/PlistBuddy -c "Add :Users array" "${ConfigurationFolder}/${Configuration}.plist"
 	i=0 ; for Element in "${AccountTypes[@]}" ; do
@@ -5621,6 +5819,12 @@ function save_Configuration {
 		/usr/libexec/PlistBuddy -c "Add :Users:${i}:uid integer ${UniqueIDs[i]}" "${ConfigurationFolder}/${Configuration}.plist"
 		/usr/libexec/PlistBuddy -c "Add :Users:${i}:shell string ${UserShells[i]}" "${ConfigurationFolder}/${Configuration}.plist"
 		/usr/libexec/PlistBuddy -c "Add :Users:${i}:home string ${NFSHomeDirectories[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+		let i++
+	done
+	defaults delete "${ConfigurationFolder}/${Configuration}" "Packages" 2>/dev/null
+	/usr/libexec/PlistBuddy -c "Add :Packages array" "${ConfigurationFolder}/${Configuration}.plist"
+	i=0 ; for Element in "${Packages[@]}" ; do
+		/usr/libexec/PlistBuddy -c "Add :Packages:${i} string ${Packages[i]}" "${ConfigurationFolder}/${Configuration}.plist"
 		let i++
 	done
 }
@@ -5641,8 +5845,803 @@ function menu_Configurations {
 	done
 }
 
+function apply_Configuration {
+	display_Subtitle "Apply Configuration"
+	if [ ${TargetType} -eq 0 ] ; then
+		press_anyKey "No target selected, please select a target first."
+		return 0
+	fi
+	if [ ${#RecordNames[@]} -eq 0 ] ; then
+		press_anyKey "No users created, please add a user first."
+		return 0
+	fi
+	if [ ${TargetType} -eq 2 ] ; then
+		if [ -e "${LibraryFolder}/${TargetName}.shadow" ] ; then rm -f "${LibraryFolder}/${TargetName}.shadow" ; fi
+		ExportName="${TargetName//.dmg/.i386.hfs.dmg}"
+		RecoveryName="${TargetName//.dmg/.i386.recovery.dmg}"
+		while [ -e "${MasterFolder}/${ExportName}" ] ; do
+			printf "An image named \033[1m${ExportName}\033[m already exists.\n"
+			read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty
+			echo
+			if [ -z "${Overwrite}" ] ; then Overwrite="n" ; fi
+			case "${Overwrite}" in
+				"Y" | "y" ) echo ; break ;;
+				"N" | "n" ) return 0 ;;
+			esac
+		done
+		hdiutil eject "${Target}" &>/dev/null
+		IFS=$'\n'
+		TargetVolumes=( `hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" -shadow | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
+		unset IFS
+		set_Target "${TargetVolumes[0]}"
+	fi
+	set_Localization "${Language}"
+	printf "Updating:	/Library/Preferences/.GlobalPreferences.plist\n"
+	if [ -e "${Target}/Library/Preferences/.GlobalPreferences.plist" ] ; then
+		rm -f "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	fi
+	set_AppleLanguages "${LanguageCode}"
+	defaults write "${Target}/Library/Preferences/.GlobalPreferences" "AppleLanguages" -array "${AppleLanguages[@]}"
+	if [ ${TargetOSMinor} -gt 5 ] ; then
+		defaults write "${Target}/Library/Preferences/.GlobalPreferences" "AppleLocale" -string "${LanguageCode}_${SACountryCode}"
+	fi
+	defaults write "${Target}/Library/Preferences/.GlobalPreferences" "Country" -string "${SACountryCode}"
+	defaults write "${Target}/Library/Preferences/.GlobalPreferences" "com.apple.AppleModemSettingTool.LastCountryCode" -string "${TZCountryCode}"
+	if [ ${UseGeoKit} -eq 0 ] ; then
+		i=0 ; for Item in "${all_cities_adj_7[@]}" ; do
+			if [ "${Item}" == "${GeonameID}" ] ; then break ; fi
+			let i++
+		done
+		defaults write "${Target}/Library/Preferences/.GlobalPreferences" "com.apple.TimeZonePref.Last_Selected_City" -array "${all_cities_adj_0[i]}" "${all_cities_adj_1[i]}" "${all_cities_adj_2[i]}" "${all_cities_adj_3[i]}" "${all_cities_adj_4[i]}" "${all_cities_adj_5[i]}" "${all_cities_adj_6[i]}"
+		if [ -d "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj" ] ; then
+			IsPlist=`file "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings" | grep -vq "property list" ; echo ${?}`
+			if [ ${IsPlist} -eq 1 ] ; then
+				LocalizedCity=`/usr/libexec/PlistBuddy -c "Print ':${all_cities_adj_5[i]}'" "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings"`
+				LocalizedCountry=`/usr/libexec/PlistBuddy -c "Print ':${all_cities_adj_6[i]}'" "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Countries.strings"`
+			else
+				LocalizedCity=`cat "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Cities.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_5[i]}\"" | awk -F "\"" '{print $4}'`
+				LocalizedCountry=`cat "${TimeZonePrefPane}/Contents/Resources/${Localization}.lproj/Localizable_Countries.strings" | iconv -f UTF-16 -t UTF-8 --unicode-subst="" | grep "\"${all_cities_adj_6[i]}\"" | awk -F "\"" '{print $4}'`
+			fi
+		else
+			LocalizedCity="${Localizable_Cities[i]}"
+			LocalizedCountry="${Localizable_Countries[i]}"
+		fi
+		defaults write "${Target}/Library/Preferences/.GlobalPreferences" "com.apple.TimeZonePref.Last_Selected_City" -array-add "${LocalizedCity}" "${LocalizedCountry}"
+		if [ ${TargetOSMinor} -gt 5 ] ; then
+			defaults write "${Target}/Library/Preferences/.GlobalPreferences" "com.apple.TimeZonePref.Last_Selected_City" -array-add "DEPRECATED IN 10.6"
+		fi
+	else
+		Query="select ZLATITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZLATITUDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZREGIONALCODE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZREGIONALCODE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZTIMEZONENAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZTIMEZONENAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZPOPULATION from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZPOPULATION=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZLONGITUDE from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZLONGITUDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZCOUNTRY from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZCOUNTRY=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ${PLACES} where Z_PK = ${ZCOUNTRY};"
+		ZCOUNTRYNAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZCODE from ${PLACES} where Z_PK = ${ZCOUNTRY};"
+		ZCODE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		ZNAME=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select Z_PK from ${PLACES} where ZGEONAMEID = ${GeonameID};"
+		Z_PK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZAR <> 0 and ZPLACE = ${Z_PK};"
+		ZAR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZCA <> 0 and ZPLACE = ${Z_PK};"
+		ZCA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZCS <> 0 and ZPLACE = ${Z_PK};"
+		ZCS=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZDA <> 0 and ZPLACE = ${Z_PK};"
+		ZDA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZDE <> 0 and ZPLACE = ${Z_PK};"
+		ZDE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZEL <> 0 and ZPLACE = ${Z_PK};"
+		ZEL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZEN <> 0 and ZPLACE = ${Z_PK};"
+		ZEN=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZES <> 0 and ZPLACE = ${Z_PK};"
+		ZES=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZFI <> 0 and ZPLACE = ${Z_PK};"
+		ZFI=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZFR <> 0 and ZPLACE = ${Z_PK};"
+		ZFR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZHE <> 0 and ZPLACE = ${Z_PK};"
+		ZHE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZHR <> 0 and ZPLACE = ${Z_PK};"
+		ZHR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZHU <> 0 and ZPLACE = ${Z_PK};"
+		ZHU=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		# Query="select ZNAME from ZGEOPLACENAME where ZID <> 0 and ZPLACE = ${Z_PK};"
+		# ZID=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZIT <> 0 and ZPLACE = ${Z_PK};"
+		ZIT=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZJA <> 0 and ZPLACE = ${Z_PK};"
+		ZJA=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZKO <> 0 and ZPLACE = ${Z_PK};"
+		ZKO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		# Query="select ZNAME from ZGEOPLACENAME where ZMS <> 0 and ZPLACE = ${Z_PK};"
+		# ZMS=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZNL <> 0 and ZPLACE = ${Z_PK};"
+		ZNL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZNO <> 0 and ZPLACE = ${Z_PK};"
+		ZNO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZPL <> 0 and ZPLACE = ${Z_PK};"
+		ZPL=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZPT <> 0 and ZPLACE = ${Z_PK};"
+		ZPT=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZPT_BR <> 0 and ZPLACE = ${Z_PK};"
+		ZPT_BR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZRO <> 0 and ZPLACE = ${Z_PK};"
+		ZRO=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZRU <> 0 and ZPLACE = ${Z_PK};"
+		ZRU=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZSK <> 0 and ZPLACE = ${Z_PK};"
+		ZSK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZSV <> 0 and ZPLACE = ${Z_PK};"
+		ZSV=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZTH <> 0 and ZPLACE = ${Z_PK};"
+		ZTH=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZTR <> 0 and ZPLACE = ${Z_PK};"
+		ZTR=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZUK <> 0 and ZPLACE = ${Z_PK};"
+		ZUK=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		# Query="select ZNAME from ZGEOPLACENAME where ZVI <> 0 and ZPLACE = ${Z_PK};"
+		# ZVI=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZZH <> 0 and ZPLACE = ${Z_PK};"
+		ZZH=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		Query="select ZNAME from ZGEOPLACENAME where ZZH_TW <> 0 and ZPLACE = ${Z_PK};"
+		ZZH_TW=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
+		defaults write "${Target}/Library/Preferences/.GlobalPreferences" "com.apple.TimeZonePref.Last_Selected_City" -array "${ZLATITUDE}" "${ZLONGITUDE}" "0" "${ZTIMEZONENAME}" "${ZCODE}" "${ZNAME}" "${ZCOUNTRYNAME}" "${ZNAME}" "${ZCOUNTRYNAME}" "DEPRECATED IN 10.6"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city dict" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:CountryCode string ${ZCODE}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:GeonameID integer ${GeonameID}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:Latitude real ${ZLATITUDE}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames dict" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		case ${TargetOSMinor} in
+			6 )
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:da string ${ZDA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:nl string ${ZNL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ko string ${ZKO}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hant string ${ZZH_TW}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ja string ${ZJA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt-PT string ${ZPT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fr string ${ZFR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hans string ${ZZH}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:it string ${ZIT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fi string ${ZFI}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:sv string ${ZSV}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt string ${ZPT_BR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:en string ${ZEN}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ru string ${ZRU}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:es string ${ZES}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pl string ${ZPL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:de string ${ZDE}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;;
+			7 )
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:da string ${ZDA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:nl string ${ZNL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ko string ${ZKO}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hant string ${ZZH_TW}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ja string ${ZJA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt-PT string ${ZPT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fr string ${ZFR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:it string ${ZIT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ru string ${ZRU}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt string ${ZPT_BR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fi string ${ZFI}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hans string ${ZZH}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:sv string ${ZSV}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:en string ${ZEN}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:es string ${ZES}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pl string ${ZPL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:de string ${ZDE}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;;
+			8 )
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ro string ${ZRO}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:tr string ${ZTR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:es string ${ZES}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:nb string ${ZNO}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ca string ${ZCA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:el string ${ZEL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt-PT string ${ZPT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fi string ${ZFI}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:nl string ${ZNL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:fr string ${ZFR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:sv string ${ZSV}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:hu string ${ZHU}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:cs string ${ZCS}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:he string ${ZHE}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:en string ${ZEN}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:da string ${ZDA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:it string ${ZIT}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ja string ${ZJA}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:uk string ${ZUK}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hans string ${ZZH}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ko string ${ZKO}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ar string ${ZAR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:ru string ${ZRU}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:zh-Hant string ${ZZH_TW}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:th string ${ZTH}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:sk string ${ZSK}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pt string ${ZPT_BR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:hr string ${ZHR}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:pl string ${ZPL}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;
+				/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:LocalizedNames:de string ${ZDE}" "${Target}/Library/Preferences/.GlobalPreferences.plist" ;;
+		esac
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:Longitude real ${ZLONGITUDE}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:Name string ${ZNAME}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:Population integer ${ZPOPULATION}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		if [ -n "${ZREGIONALCODE}" ] ; then
+			/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:RegionalCode string ${ZREGIONALCODE}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		fi
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:TimeZoneName string ${ZTIMEZONENAME}" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+		/usr/libexec/PlistBuddy -c "Add :com.apple.preferences.timezone.selected_city:Version integer 1" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	fi
+	chown 0:0 "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	chmod 644 "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	# Begin: Debug Output
+	# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	/Library/Preferences/com.apple.HIToolbox.plist\n"
+	if [ -e "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ] ; then
+		rm -f "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	fi
+	if [ -n "${SATypingStyle}" ] ; then
+		set_Bundle_IDs "${SATypingStyle}"
+		set_Input_Modes "${SATypingStyle}"
+		set_InputSourceKinds "${SATypingStyle}"
+		set_KeyboardLayout_IDs "${SATypingStyle}"
+		set_KeyboardLayout_Names "${SATypingStyle}"
+		set_SelectedInputSource "${SATypingStyle}"
+		set_CurrentKeyboardLayoutInputSourceID "${SATypingStyle}"
+	else
+		unset Bundle_IDs[@]
+		unset Input_Modes[@]
+		set_InputSourceKinds "${SAKeyboard}"
+		set_KeyboardLayout_IDs "${SAKeyboard}"
+		set_KeyboardLayout_Names "${SAKeyboard}"
+		set_SelectedInputSource "${SAKeyboard}"
+		set_CurrentKeyboardLayoutInputSourceID "${SAKeyboard}"
+	fi
+	set_DefaultAsciiInputSource
+	if [ ${TargetOSMinor} -gt 5 ] ; then
+		defaults write "${Target}/Library/Preferences/com.apple.HIToolbox" "AppleCurrentKeyboardLayoutInputSourceID" -string "${CurrentKeyboardLayoutInputSourceID}"
+	fi
+	defaults write "${Target}/Library/Preferences/com.apple.HIToolbox" "AppleDefaultAsciiInputSource" -dict "InputSourceKind" -string "${InputSourceKind}" "KeyboardLayout ID" -int ${KeyboardLayout_ID} "KeyboardLayout Name" -string "${KeyboardLayout_Name}"
+	/usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources array" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	i=0 ; while [ ${i} -lt ${#InputSourceKinds[@]} ] ; do
+		/usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i} dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		if [ -n "${Bundle_IDs[i]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i}:Bundle\ ID string ${Bundle_IDs[i]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+		if [ -n "${Input_Modes[i]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i}:Input\ Mode string ${Input_Modes[i]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+		if [ -n "${InputSourceKinds[i]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i}:InputSourceKind string ${InputSourceKinds[i]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+		if [ -n "${KeyboardLayout_IDs[i]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i}:KeyboardLayout\ ID integer ${KeyboardLayout_IDs[i]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+		if [ -n "${KeyboardLayout_Names[i]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleEnabledInputSources:${i}:KeyboardLayout\ Name string ${KeyboardLayout_Names[i]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+		let i++
+	done
+	set_ScriptManager "${LanguageCode}"
+	if [ ${TargetOSMinor} -eq 5 ] ; then set_ITLB "${LanguageCode}" ; else unset ITLB ; fi
+	if [ -n "${ITLB}" ] ; then
+		/usr/libexec/PlistBuddy -c "Add :AppleItlbDate dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleItlbDate:${ScriptManager} integer ${ITLB}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleItlbNumber dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleItlbNumber:${ScriptManager} integer ${ITLB}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	fi
+	set_ResourceID "${LanguageCode}" "${SACountryCode}"
+	if [ -n "${ResourceID}" ] ; then
+		/usr/libexec/PlistBuddy -c "Add :AppleDateResID dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleDateResID:${ScriptManager} integer ${ResourceID}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleNumberResID dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleNumberResID:${ScriptManager} integer ${ResourceID}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleTimeResID dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+		/usr/libexec/PlistBuddy -c "Add :AppleTimeResID:${ScriptManager} integer ${ResourceID}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	fi
+	/usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources array" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	/usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0 dict" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	if [ -n "${Bundle_IDs[SelectedInputSource]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0:Bundle\ ID string ${Bundle_IDs[SelectedInputSource]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+	if [ -n "${Input_Modes[SelectedInputSource]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0:Input\ Mode string ${Input_Modes[SelectedInputSource]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+	if [ -n "${InputSourceKinds[SelectedInputSource]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0:InputSourceKind string ${InputSourceKinds[SelectedInputSource]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+	if [ -n "${KeyboardLayout_IDs[SelectedInputSource]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0:KeyboardLayout\ ID integer ${KeyboardLayout_IDs[SelectedInputSource]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+	if [ -n "${KeyboardLayout_Names[SelectedInputSource]}" ] ; then /usr/libexec/PlistBuddy -c "Add :AppleSelectedInputSources:0:KeyboardLayout\ Name string ${KeyboardLayout_Names[SelectedInputSource]}" "${Target}/Library/Preferences/com.apple.HIToolbox.plist" ; fi
+	chown 0:0 "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	chmod 644 "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	# Begin: Debug Output
+	# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	/etc/ntp.conf\n"
+	printf "server ${NTPServer}\n" > "${Target}/etc/ntp.conf"
+	chown 0:0 "${Target}/etc/ntp.conf"
+	chmod 644 "${Target}/etc/ntp.conf"
+	# Begin: Debug Output
+	# cat "${Target}/etc/ntp.conf"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	/var/db/.AppleSetupDone\n"
+	touch "${Target}/var/db/.AppleSetupDone"
+	chown 0:0 "${Target}/var/db/.AppleSetupDone"
+	chmod 600 "${Target}/var/db/.AppleSetupDone"
+	printf "Creating:	/var/db/launchd.db/com.apple.launchd/overrides.plist\n"
+	if [ ! -e "${Target}/var/db/launchd.db/com.apple.launchd" ] ; then
+		mkdir -p "${Target}/var/db/launchd.db/com.apple.launchd"
+	fi
+	if [ ${NTPEnabled} -eq 1 ] ; then
+		defaults write "${Target}/var/db/launchd.db/com.apple.launchd/overrides" "org.ntp.ntpd" -dict "Disabled" -bool FALSE
+	else
+		defaults write "${Target}/var/db/launchd.db/com.apple.launchd/overrides" "org.ntp.ntpd" -dict "Disabled" -bool TRUE
+	fi
+	if [ ${RemoteLogin} -eq 1 ] ; then
+		defaults write "${Target}/var/db/launchd.db/com.apple.launchd/overrides" "com.openssh.sshd" -dict "Disabled" -bool FALSE
+	else
+		defaults write "${Target}/var/db/launchd.db/com.apple.launchd/overrides" "com.openssh.sshd" -dict "Disabled" -bool TRUE
+	fi
+	chown 0:0 "${Target}/var/db/launchd.db/com.apple.launchd/overrides.plist"
+	chmod 600 "${Target}/var/db/launchd.db/com.apple.launchd/overrides.plist"
+	# Begin: Debug Output
+	# /usr/libexec/PlistBuddy -c "Print" "${Target}/var/db/launchd.db/com.apple.launchd/overrides.plist"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	/var/log/CDIS.custom\n"
+	printf "LANGUAGE=${Localization}\n" > "${Target}/var/log/CDIS.custom"
+	chown 0:0 "${Target}/var/log/CDIS.custom"
+	chmod 644 "${Target}/var/log/CDIS.custom"
+	# Begin: Debug Output
+	# cat "${Target}/var/log/CDIS.custom"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	/Library/LaunchDaemons/FirstBoot.plist\n"
+	defaults write "${Target}/Library/LaunchDaemons/FirstBoot" "Label" -string "FirstBoot"
+	defaults write "${Target}/Library/LaunchDaemons/FirstBoot" "ProgramArguments" -array "${FirstBootPath}/FirstBoot.sh"
+	defaults write "${Target}/Library/LaunchDaemons/FirstBoot" "RunAtLoad" -bool TRUE
+	chown 0:0 "${Target}/Library/LaunchDaemons/FirstBoot.plist"
+	chmod 644 "${Target}/Library/LaunchDaemons/FirstBoot.plist"
+	# Begin: Debug Output
+	# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/LaunchDaemons/FirstBoot.plist"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	${FirstBootPath}/FirstBoot.sh\n"
+	mkdir -p "${Target}/${FirstBootPath}/Actions"
+	mkdir -p "${Target}/${FirstBootPath}/Packages"
+	printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "ScriptPath=\`/usr/bin/dirname \"\${0}\"\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "IFS=\$'\\\n'" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Actions=( \`/bin/ls \"\${ScriptPath}/Actions\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Packages=( \`/bin/ls \"\${ScriptPath}/Packages\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "unset IFS" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "for Action in \"\${Actions[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "	\"\${ScriptPath}/Actions/\${Action}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "done" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Minor=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" \'{print \$2}\'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Point=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" \'{print \$3}\'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "if [ \${Minor} -eq 7 -a \${Point} -gt 3 ] || [ \${Minor} -gt 7 ] ; then GateKeeper=\"-allowUntrusted\" ; fi" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "for Package in \"\${Packages[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "	/usr/sbin/installer -dumplog \"\${GateKeeper}\" -pkg \"\${ScriptPath}/Packages/\${Package}\" -target / 2>/dev/null" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "done" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "/usr/bin/srm \"/Library/LaunchDaemons/FirstBoot.plist\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "/usr/bin/srm -rf \"\${ScriptPath}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "exit 0" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	chown 0:0 "${Target}/${FirstBootPath}/FirstBoot.sh"
+	chmod 755 "${Target}/${FirstBootPath}/FirstBoot.sh"
+	# Begin: Debug Output
+	# cat "${Target}/${FirstBootPath}/FirstBoot.sh"
+	# printf "\n"
+	# End: Debug Output
+	printf "Creating:	${FirstBootPath}/Actions/ComputerName.sh\n"
+	printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	case "${ComputerName}" in
+		"Model and MAC Address" )
+			echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" \'{print \$NF}\'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+			echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk \'{print \$NF}\' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+			echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+		"Serial Number" )
+			echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+	esac
+	echo "LocalHostName=\"\${ComputerName// /-}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	echo "/usr/sbin/scutil --set ComputerName \"\${ComputerName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	echo "/usr/sbin/scutil --set LocalHostName \"\${LocalHostName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	chown 0:0 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	chmod 755 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	# Begin: Debug Output
+	# cat "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	# printf "\n"
+	# End: Debug Output
+	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then
+		printf "Creating:	${FirstBootPath}/Actions/LocationServices.sh\n"
+		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c51-62 | awk {'print tolower()'}\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "else" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-62\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "fi" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "mkdir -p \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"ObsoleteDataDeleted\" -bool TRUE" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.notbackedup.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "chown -Rh 205:205 \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		chown 0:0 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		chmod 755 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+		# Begin: Debug Output
+		# cat "${Target}/usr/libexec/FirstBoot/Actions/LocationServices.sh"
+		# printf "\n"
+		# End: Debug Output
+	fi
+	if [ ${RemoteManagement} -eq 1 ] ; then
+		printf "Creating:	/Library/Preferences/com.apple.RemoteManagement.plist\n"
+		defaults write "${Target}/Library/Preferences/com.apple.RemoteManagement" "ARD_AllLocalUsersPrivs" -int 1073742079
+		defaults write "${Target}/Library/Preferences/com.apple.RemoteManagement" "ARD_AllLocalUsers" -bool TRUE
+		chown 0:0 "${Target}/Library/Preferences/com.apple.RemoteManagement.plist"
+		chmod 644 "${Target}/Library/Preferences/com.apple.RemoteManagement.plist"
+		# Begin: Debug Output
+		# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/Preferences/com.apple.RemoteManagement.plist"
+		# printf "\n"
+		# End: Debug Output
+		printf "Creating:	/etc/RemoteManagement.launchd\n"
+		printf "enabled" > "${Target}/etc/RemoteManagement.launchd"
+		chown 0:0 "${Target}/etc/RemoteManagement.launchd"
+		chmod 644 "${Target}/etc/RemoteManagement.launchd"
+		# Begin: Debug Output
+		# cat "${Target}/etc/RemoteManagement.launchd" ; printf "\n"
+		# printf "\n"
+		# End: Debug Output
+		printf "Creating:	${FirstBootPath}/Actions/RemoteManagement.sh\n"
+		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
+		echo "/System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -activate -configure -access -on -restart -agent -privs -all" >> "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
+		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
+		chown 0:0 "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
+		chmod 755 "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
+		# Begin: Debug Output
+		# cat "${Target}/usr/libexec/FirstBoot/Actions/RemoteManagement.sh"
+		# printf "\n"
+		# End: Debug Output
+	fi
+	printf "\n"
+	i=0 ; for RecordName in "${RecordNames[@]}" ; do
+		printf "Creating User:	${RecordName}\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -create /Local/Target/Users/"${RecordName}"
+		printf "		Setting Full Name"
+		# Begin: Debug Output
+		printf ":	${RealNames[i]}"
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" RealName "${RealNames[i]}"
+		printf "		Setting Password"
+		if [ ${TargetOSMinor} -le 6 ] ; then
+			GeneratedUID=`dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/"${RecordName}" GeneratedUID | awk '{print $2}'`
+			if [ ! -e "${Target}/var/db/shadow/hash" ] ; then
+				mkdir -p "${Target}/var/db/shadow/hash"
+				chmod -R 0700 "${Target}/var/db/shadow"
+			fi
+			if [ -n "${GeneratedUID}" ] && [ -e "/var/db/shadow/hash/${GeneratedUID}" ] ; then
+				mv "/var/db/shadow/hash/${GeneratedUID}" "${Target}/var/db/shadow/hash/" &>/dev/null
+			fi
+		fi
+		# Begin: Debug Output
+		printf ":	"
+		if [ -n "${Passwords[i]}" ] ; then
+			j=0 ; while [ ${j} -lt ${#Passwords[i]} ] ; do printf "*" ; let j++ ; done
+		else
+			printf "-"
+		fi
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -passwd /Local/Target/Users/"${RecordName}" "${Passwords[i]}"
+		printf "		Setting Password Hint"
+		# Begin: Debug Output
+		printf ":	" ; if [ -n "${AuthenticationHints[i]}" ] ; then printf "${AuthenticationHints[i]}" ; else printf "-" ; fi
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" AuthenticationHint "${AuthenticationHints[i]}"
+		printf "		Setting User ID"
+		# Begin: Debug Output
+		printf ":	${UniqueIDs[i]}"
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" UniqueID ${UniqueIDs[i]}
+		if [ ${UniqueIDs[i]} -lt 501 ] ; then
+			defaults write "${Target}/Library/Preferences/com.apple.loginwindow" Hide500Users -bool TRUE
+			defaults write "${Target}/Library/Preferences/com.apple.loginwindow" HiddenUsersList -array-add "${RecordName}"
+			chmod 0644 "${Target}/Library/Preferences/com.apple.loginwindow.plist"
+		fi
+		printf "		Setting Group ID"
+		# Begin: Debug Output
+		printf ":	20"
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" PrimaryGroupID 20
+		printf "		Setting Login Shell"
+		# Begin: Debug Output
+		printf ":	${UserShells[i]}"
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" UserShell "${UserShells[i]}"
+		printf "		Setting Home Directory"
+		# Begin: Debug Output
+		printf ":	${NFSHomeDirectories[i]}"
+		# End: Debug Output
+		printf "\n"
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Users/"${RecordName}" NFSHomeDirectory "${NFSHomeDirectories[i]}"
+		ditto "${Target}/System/Library/User Template/Non_localized" "${Target}/${NFSHomeDirectories[i]}"
+		ditto "${Target}/System/Library/User Template/${Localization}.lproj" "${Target}/${NFSHomeDirectories[i]}"
+		defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/.GlobalPreferences" AppleMiniaturizeOnDoubleClick -bool FALSE
+		defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/.GlobalPreferences" AppleScrollAnimationEnabled -bool TRUE
+		chown -Rh ${UniqueID}:staff "${Target}/${NFSHomeDirectories[i]}"
+		if [ ${TargetOSMinor} -eq 5 ] || [ "${AccountTypes[i]}" == "Administrator" ] ; then
+			printf "		Adding to Group(s)"
+			# Begin: Debug Output
+			printf ":	"
+			# End: Debug Output
+		fi
+		if [ ${TargetOSMinor} -eq 5 ] ; then
+			# Begin: Debug Output
+			printf "staff\n"
+			printf "					"
+			# End: Debug Output
+			dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/staff GroupMembership "${RecordName}"
+		fi
+		if [ "${AccountTypes[i]}" == "Administrator" ] ; then
+			# Begin: Debug Output
+			printf "admin\n"
+			# End: Debug Output
+			dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/admin GroupMembership "${RecordName}"
+			# Begin: Debug Output
+			printf "					_lpadmin\n"
+			# End: Debug Output
+			dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/_lpadmin GroupMembership "${RecordName}"
+			# Begin: Debug Output
+			printf "					_appserverusr\n"
+			# End: Debug Output
+			dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/_appserverusr GroupMembership "${RecordName}"
+			# Begin: Debug Output
+			printf "					_appserveradm\n"
+			# End: Debug Output
+			dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/_appserveradm GroupMembership "${RecordName}"
+		fi
+		printf "\n"
+		let i++
+	done
+	if [ ${#Packages[@]} -gt 0 ] ; then
+		printf "Installing packages\n"
+		for Package in "${Packages[@]}" ; do
+			find "${PackageFolder}" -name "${Package}" -a \! -path "*pkg/*" | while read PackagePath ; do
+				IFS=$'\n'
+				AvailableTargets=( `installer -volinfo -pkg "${PackagePath}" | grep "/Volumes/"` )
+				unset IFS
+				PostponedInstall=1
+				for AvailableTarget in "${AvailableTargets[@]}" ; do
+					if [ "${AvailableTarget}" == "${Target}" ] ; then PostponedInstall=0 ; break ; fi
+				done
+				if [ ${PostponedInstall} -eq 0 ] ; then
+					install_Package "${PackagePath}" "${Target}" 0
+				else
+					IFS=$'\n'
+					PackageTitles=( `installer -pkginfo -pkg "${PackagePath}"` )
+					unset IFS
+					printf "installer: Package name is ${PackageTitles[0]}\n"
+					printf "installer: Target volume unavailable, will attempt postponed install.\n"
+					if [ ! -e "${Target}/${FirstBootPath}/Packages/${Package}" ] ; then
+						ditto "${PackagePath}" "${Target}/${FirstBootPath}/Packages/${Package}"
+					else
+						printf "installer: Duplicate package, skipping.\n"
+					fi
+				fi
+			done
+		done
+		printf "\n"
+	fi
+	if [ ${#RemovableItems[@]} -gt 0 ] ; then
+		for Item in "${RemovableItems[@]}" ; do
+			case "${Item}" in
+				"iPhoto" )
+					Removables=(
+						"Applications/iPhoto.app"
+						"Library/Application Support/iLife"
+						"Library/Application Support/iPhoto"
+						"Library/Application Support/NetServices"
+						"Library/Frameworks/iLifeKit.framework"
+						"Library/Frameworks/iLifePageLayout.framework"
+						"Library/Frameworks/iLifeSQLAccess.framework"
+						"Library/Internet Plug-Ins/iPhotoPhotocast.plugin"
+						"Library/Receipts/iPhoto.pkg"
+						"Library/Receipts/iPhotoContent.pkg"
+						"var/db/receipts/com.apple.pkg.iPhoto_AppStore.bom"
+						"var/db/receipts/com.apple.pkg.iPhoto_AppStore.plist"
+						"var/db/receipts/com.apple.pkg.iPhoto.bom"
+						"var/db/receipts/com.apple.pkg.iPhoto.plist"
+						"var/db/receipts/com.apple.pkg.iPhotoContent.bom"
+						"var/db/receipts/com.apple.pkg.iPhotoContent.plist"
+						"var/db/receipts/com.apple.pkg.iPhotoLibraryUpgradeTool.bom"
+						"var/db/receipts/com.apple.pkg.iPhotoLibraryUpgradeTool.plist"
+					) ;
+					if [ -e "${Target}/Applications/iPhoto.app" ] ; then echo "Removing:	iPhoto" ; fi ;;
+				"iMovie" )
+					Removables=(
+						"Applications/iMovie.app"
+						"Library/Receipts/iMovie.pkg"
+						"var/db/receipts/com.apple.pkg.iMovie_AppStore.bom"
+						"var/db/receipts/com.apple.pkg.iMovie_AppStore.plist"
+						"var/db/receipts/com.apple.pkg.iMovie.bom"
+						"var/db/receipts/com.apple.pkg.iMovie.plist"
+					) ;
+					if [ -e "${Target}/Applications/iMovie.app" ] ; then echo "Removing:	iMovie" ; fi ;;
+				"iDVD" )
+					Removables=(
+						"Applications/iDVD.app"
+						"Library/Application Support/iDVD"
+						"Library/Application Support/iDVD/Themes"
+						"Library/Documentation/Applications/iDVD"
+						"Library/Receipts/iDVD.pkg"
+						"Library/Receipts/iDVDExtraContent.pkg"
+						"Library/Receipts/iDVDThemes.pkg"
+						"var/db/receipts/com.apple.pkg.iDVD.bom"
+						"var/db/receipts/com.apple.pkg.iDVD.plist"
+						"var/db/receipts/com.apple.pkg.iDVDExtraContent.bom"
+						"var/db/receipts/com.apple.pkg.iDVDExtraContent.plist"
+						"var/db/receipts/com.apple.pkg.iDVDThemes.bom"
+						"var/db/receipts/com.apple.pkg.iDVDThemes.plist"
+					) ;
+					if [ -e "${Target}/Applications/iDVD.app" ] ; then echo "Removing:	iDVD" ; fi ;;
+				"GarageBand" )
+					Removables=(
+						"Applications/GarageBand.app"
+						"Library/Application Support/GarageBand"
+						"Library/Application Support/GarageBand/Instrument Library"
+						"Library/Application Support/GarageBand/Learn to Play"
+						"Library/Application Support/GarageBand/Magic GarageBand"
+						"Library/Application Support/GarageBand/Templates"
+						"Library/Audio/Apple Loops"
+						"Library/Audio/Apple Loops Index"
+						"Library/Audio/Apple Loops/Apple/Apple Loops for GarageBand"
+						"Library/Audio/MIDI Drivers/EmagicUSBMIDIDriver.plugin"
+						"Library/QuickLook/GBQLGenerator.qlgenerator"
+						"Library/Receipts/GarageBand_Instruments.pkg"
+						"Library/Receipts/GarageBand_Loops.pkg"
+						"Library/Receipts/GarageBand_LTPContent.pkg"
+						"Library/Receipts/GarageBand_MagicContent.pkg"
+						"Library/Receipts/GarageBand.pkg"
+						"Library/Receipts/GarageBandExtraContent.pkg"
+						"Library/Receipts/GarageBandFactoryContent.pkg"
+						"Library/Spotlight/GBSpotlightImporter.mdimporter"
+						"Library/Spotlight/LogicPro.mdimporter"
+						"var/db/receipts/com.apple.pkg.GarageBand_AppStore.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand_AppStore.plist"
+						"var/db/receipts/com.apple.pkg.GarageBand_Instruments.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand_Instruments.plist"
+						"var/db/receipts/com.apple.pkg.GarageBand_Loops.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand_Loops.plist"
+						"var/db/receipts/com.apple.pkg.GarageBand_LTPContent.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand_LTPContent.plist"
+						"var/db/receipts/com.apple.pkg.GarageBand_MagicContent.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand_MagicContent.plist"
+						"var/db/receipts/com.apple.pkg.GarageBand.bom"
+						"var/db/receipts/com.apple.pkg.GarageBand.plist"
+						"var/db/receipts/com.apple.pkg.GarageBandBasicContent.bom"
+						"var/db/receipts/com.apple.pkg.GarageBandBasicContent.plist"
+						"var/db/receipts/com.apple.pkg.GarageBandExtraContent.bom"
+						"var/db/receipts/com.apple.pkg.GarageBandExtraContent.plist"
+						"var/db/receipts/com.apple.pkg.GarageBandFactoryContent.bom"
+						"var/db/receipts/com.apple.pkg.GarageBandFactoryContent.plist"
+					) ;
+					if [ -e "${Target}/Applications/GarageBand.app" ] ; then echo "Removing:	GarageBand" ; fi ;;
+				"Sounds & Jingles" )
+					Removables=(
+						"Library/Audio/Apple Loops/Apple/iLife Sound Effects"
+						"Library/Receipts/iLifeSoundEffects_Loops.pkg"
+						"var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom"
+						"var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.plist"
+					) ;
+					if [ -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] ; then echo "Removing:	Sounds & Jingles" ; fi ;;
+				"iWeb" )
+					Removables=(
+						"Applications/iWeb.app"
+						"Library/Fonts/AppleCasual.dfont"
+						"Library/Fonts/BlairMdITC TT-Medium"
+						"Library/Fonts/Bordeaux Roman Bold LET Fonts"
+						"Library/Fonts/Cracked"
+						"Library/Fonts/Handwriting - Dakota"
+						"Library/Fonts/Palatino"
+						"Library/Fonts/PortagoITC TT"
+						"Library/Receipts/iWeb.pkg"
+						"var/db/receipts/com.apple.pkg.iWeb.bom"
+						"var/db/receipts/com.apple.pkg.iWeb.plist"
+					) ;
+					if [ -e "${Target}/Applications/iWeb.app" ] ; then echo "Removing:	iWeb" ; fi ;;
+			esac
+			for Removable in "${Removables[@]}" ; do
+				if [ -e "${Target}/${Removable}" ] ; then
+					echo "		/${Removable}"
+					rm -rf "${Target}/${Removable}"
+				fi
+			done
+		done
+		if [ -e "${Target}/Library/Receipts/iLifeCookie.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeCookie.bom" ] ; then
+			if [ ! -e "${Target}/Applications/iPhoto.app" ] && [ ! -e "${Target}/Applications/iMovie.app" ] && [ ! -e "${Target}/Applications/iDVD.app" ] && [ ! -e "${Target}/Applications/GarageBand.app" ] && [ ! -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] && [ ! -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] && [ ! -e "${Target}/Applications/iWeb.app" ] ; then
+				Removables=(
+					"/Library/Application Support/iLifeSlideshow"
+					"Library/Documentation/Applications/iMovie"
+					"Library/Documentation/Applications/iPhoto"
+					"Library/Documentation/Applications/iWeb"
+					"Library/Frameworks/iLifeFaceRecognition.framework"
+					"Library/Frameworks/iLifeSlideshow.framework"
+					"Library/Receipts/iLifeCookie.pkg"
+					"Library/Receipts/iLifeSlideshow.pkg"
+					"System/Library/CoreServices/CoreTypes.bundle/Contents/Library/iLifeSlideshowTypes.bundle"
+					"System/Library/PrivateFrameworks/iLifeSlideshow.framework"
+					"var/db/receipts/com.apple.pkg.iLifeCookie.bom"
+					"var/db/receipts/com.apple.pkg.iLifeCookie.plist"
+					"var/db/receipts/com.apple.pkg.iLifeFaceRecognition.bom"
+					"var/db/receipts/com.apple.pkg.iLifeFaceRecognition.plist"
+					"var/db/receipts/com.apple.pkg.iLifeRegistration.bom"
+					"var/db/receipts/com.apple.pkg.iLifeRegistration.plist"
+					"var/db/receipts/com.apple.pkg.iLifeRegistrationPost.bom"
+					"var/db/receipts/com.apple.pkg.iLifeRegistrationPost.plist"
+					"var/db/receipts/com.apple.pkg.iLifeSlideshow_v2.bom"
+					"var/db/receipts/com.apple.pkg.iLifeSlideshow_v2.plist"
+					"var/db/receipts/com.apple.pkg.iLifeSlideshow.bom"
+					"var/db/receipts/com.apple.pkg.iLifeSlideshow.plist"
+					"var/tmp/.BlankFile"
+				)
+				echo "Removing:	iLife Support"
+				for Removable in "${Removables[@]}" ; do
+					if [ -e "${Target}/${Removable}" ] ; then
+						echo "		/${Removable}"
+						rm -rf "${Target}/${Removable}"
+					fi
+				done
+			fi
+		fi
+		echo
+	fi
+	if [ ${TargetType} -eq 1 ] ; then
+		set_TargetProperties
+	fi
+	if [ ${TargetType} -eq 2 ] ; then
+		printf "Exporting image(s)\n"
+		if [ -e "${MasterFolder}/${ExportName}" ] ; then rm -f "${MasterFolder}/${ExportName}" ; fi
+		if [ -e "${MasterFolder}/${RecoveryName}" ] ; then rm -f "${MasterFolder}/${RecoveryName}" ; fi
+		for TargetVolume in "${TargetVolumes[@]}" ; do
+			rm -rf "/Volumes/${TargetVolume}/.Spotlight-V100"
+			rm -rf "/Volumes/${TargetVolume}/.Trashes"
+			rm -rf "/Volumes/${TargetVolume}/.fseventsd"
+		done
+		case ${ExportType} in
+			1 )
+				hdiutil eject "${Target}" &>/dev/null ;
+				hdiutil convert -format UDZO "${LibraryFolder}/${TargetName}" -shadow "${LibraryFolder}/${TargetName}.shadow" -o "${MasterFolder}/${ExportName}" ;;
+			2 )
+				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${ExportName}" ;
+				hdiutil eject "${Target}" &>/dev/null ;;
+			3 )
+				printf "Initializing…\n"
+				printf "Creating…\n"
+				printf "copying \"${Target}\"."
+				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${ExportName}" ;
+				if [ ${#TargetVolumes[@]} -gt 1 ] ; then
+					TargetDevice=`diskutil info "${Target}" | grep -m 1 "Part of Whole:" | awk '{print $NF}'` ;
+					hdiutil unmount "/dev/${TargetDevice}s3" &>/dev/null
+					hdiutil create -srcdevice "/dev/${TargetDevice}s3" "${MasterFolder}/${RecoveryName}" ;
+				fi
+				hdiutil eject "${Target}" &>/dev/null ;;
+		esac
+		printf "\n"
+		printf "Scanning image(s) for restore\n"
+		asr imagescan --source "${MasterFolder}/${ExportName}"
+		if [ -e "${MasterFolder}/${RecoveryName}" ] ; then asr imagescan --source "${MasterFolder}/${RecoveryName}" ; fi
+		rm -f "${LibraryFolder}/${TargetName}.shadow"
+		Volume=`hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" | grep "Apple_HFS" | awk -F "/Volumes/" '{print $NF}'`
+		set_Target "${Volume}"
+		printf "\n"
+	fi
+	press_anyKey
+}
+
 function menu_SystemSetup {
-	SystemSetupOptions=( "Main Menu" "Select Target" "Configurations" "System Preferences" "Users" "Packages" "Apply Configuration" "Export Master" )
+	SystemSetupOptions=( "Main Menu" "Select Target" "Configurations" "System Preferences" "Users" "Packages" "Remove Software" "Apply Configuration" )
 	while [ "${Option}" != "Main Menu" ] ; do
 		display_Subtitle "Configure System"
 		display_Target
@@ -5655,11 +6654,15 @@ function menu_SystemSetup {
 				"System Preferences" ) menu_SystemPreferences ; unset Option ; break ;;
 				"Users" ) menu_Users ; unset Option ; break ;;
 				"Packages" ) menu_Packages ; unset Option ; break ;;
-				"Apply Configuration" ) not_Implemented ; unset Option ; break ;;
-				"Export Master" ) not_Implemented ; unset Option ; break ;;
+				"Remove Software" ) menu_RemoveSoftware ; unset Option ; break ;;
+				"Apply Configuration" ) apply_Configuration ; unset Option ; break ;;
 			esac
 		done
 	done
+	if [ ${TargetType} -eq 2 ] ; then hdiutil eject "${Target}" &>/dev/null ; fi
+	unset TargetName
+	unset TargetType
+	set_TargetProperties
 }
 
 function main_Menu {
@@ -5689,6 +6692,5 @@ set_TargetProperties
 set_LanguageCountryCodes "${LanguageCode}"
 set_OtherCountryCodes
 main_Menu
-#display_Output
 
 exit 0
