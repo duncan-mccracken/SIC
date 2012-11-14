@@ -36,7 +36,6 @@ GeonameID=5341145
 TZAuto=0
 RemoteLogin=0
 RemoteManagement=0
-ComputerName="Model and MAC Address"
 
 # Version
 SICVersion="1.5b4"
@@ -1046,7 +1045,8 @@ function display_Target {
 	if [ -n "${TargetName}" ] ; then printf "${TargetName}" ; else printf "-" ; fi
 	printf "\n"
 	# Begin: Debug Output
-	# echo "TargetType:		${TargetType}"
+	# echo "MountPoint:	${Target}"
+	# echo "TargetType:	${TargetType}"
 	# End: Debug Output
 	printf "System:		"
 	if [ -n "${TargetOSBuild}" ] ; then
@@ -1134,8 +1134,8 @@ function set_LanguageCode {
 
 function refresh_Language {
 	set_Languages
-	e=0 ; for LANGUAGE in "${Languages[@]}" ; do if [ "${LANGUAGE}" == "${Language}" ] ; then e=1 ; break ; fi ; done
-	if [ ${e} -eq 0 ] ; then Language="English" ; fi
+	i=0 ; for LANGUAGE in "${Languages[@]}" ; do if [ "${LANGUAGE}" == "${Language}" ] ; then i=1 ; break ; fi ; done
+	if [ ${i} -eq 0 ] ; then Language="English" ; fi
 	set_LanguageCode "${Language}"
 	set_AppleLanguages "${LanguageCode}"
 }
@@ -1614,8 +1614,8 @@ function convert_SACountryCodeToName {
 
 function refresh_Country {
 	set_AllCountryCodes
-	e=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${SACountryCode}" ] ; then e=1 ; break ; fi ; done
-	if [ ${e} -eq 0 ] ; then SACountryCode="US" ; fi
+	i=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${SACountryCode}" ] ; then i=1 ; break ; fi ; done
+	if [ ${i} -eq 0 ] ; then SACountryCode="US" ; fi
 	SACountry=`convert_SACountryCodeToName ${TargetOSMinor} "${SACountryCode}"`
 }
 
@@ -1624,8 +1624,8 @@ function set_LanguageCountryCodes {
 	set_AllCountryCodes
 	LanguageCountryCodes=( `/usr/libexec/PlistBuddy -c "Print ':${1}'" "${Target}/System/Library/PrivateFrameworks/International.framework/Resources/SALanguageToCountry.plist" 2>/dev/null | grep -v "{\|}"` )
 	i=0 ; for LanguageCountryCode in "${LanguageCountryCodes[@]}" ; do
-		e=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${LanguageCountryCode}" ] ; then e=1 ; break ; fi ; done
-		if [ ${e} -eq 0 ] ; then unset LanguageCountryCodes[i] ; fi
+		j=0 ; for Code in "${AllCountryCodes[@]}" ; do if [ "${Code}" == "${LanguageCountryCode}" ] ; then j=1 ; break ; fi ; done
+		if [ ${j} -eq 0 ] ; then unset LanguageCountryCodes[i] ; fi
 		let i++
 	done
 	if [ ${#LanguageCountryCodes[@]} -eq 0 ] ; then LanguageCountryCodes=( "US" ) ; fi
@@ -1643,10 +1643,10 @@ function set_LanguageCountryNames {
 function set_OtherCountryCodes {
 	unset OtherCountryCodes[@]
 	for Code in "${AllCountryCodes[@]}" ; do
-		e=0 ; for LanguageCountryCode in "${LanguageCountryCodes[@]}" ; do
-			if [ "${Code}" == "${LanguageCountryCode}" ] ; then e=1 ; break ; fi
+		j=0 ; for LanguageCountryCode in "${LanguageCountryCodes[@]}" ; do
+			if [ "${Code}" == "${LanguageCountryCode}" ] ; then j=1 ; break ; fi
 		done
-		if [ ${e} -eq 0 ] ; then OtherCountryCodes=( "${OtherCountryCodes[@]}" "${Code}" ) ; fi
+		if [ ${j} -eq 0 ] ; then OtherCountryCodes=( "${OtherCountryCodes[@]}" "${Code}" ) ; fi
 	done
 }
 
@@ -2350,8 +2350,8 @@ function set_InputSourceIDs {
 
 function refresh_Keyboard {
 	set_InputSourceIDs
-	e=0 ; for ID in "${InputSourceIDs[@]}" ; do if [ "${ID}" == "${InputSourceID}" ] ; then e=1 ; break ; fi ; done
-	if [ ${e} -eq 0 ] ; then InputSourceID="US" ; fi
+	j=0 ; for ID in "${InputSourceIDs[@]}" ; do if [ "${ID}" == "${InputSourceID}" ] ; then j=1 ; break ; fi ; done
+	if [ ${j} -eq 0 ] ; then InputSourceID="US" ; fi
 	set_SAKeyboard_SATypingStyle "${InputSourceID}"
 }
 
@@ -2592,10 +2592,10 @@ function set_CurrentKeyboards {
 function set_OtherKeyboards {
 	unset OtherKeyboards[@]
 	for Keyboard in "${AllKeyboards[@]}" ; do
-		e=0 ; for CurrentKeyboard in "${CurrentKeyboards[@]}" ; do
-			if [ "${Keyboard}" == "${CurrentKeyboard}" ] ; then e=1 ; break ; fi
+		j=0 ; for CurrentKeyboard in "${CurrentKeyboards[@]}" ; do
+			if [ "${Keyboard}" == "${CurrentKeyboard}" ] ; then j=1 ; break ; fi
 		done
-		if [ ${e} -eq 0 ] ; then OtherKeyboards=( "${OtherKeyboards[@]}" "${Keyboard}" ) ; fi
+		if [ ${j} -eq 0 ] ; then OtherKeyboards=( "${OtherKeyboards[@]}" "${Keyboard}" ) ; fi
 	done
 }
 
@@ -3665,8 +3665,8 @@ function set_NTPServerName {
 
 function set_NTPServerNames {
 	NTPServerNames=( "Apple Americas/U.S. (time.apple.com)" "Apple Asia (time.asia.apple.com)" "Apple Europe (time.euro.apple.com)" )
-	e=0 ; for ServerName in "${NTPServerNames[@]}" ; do if [ "${ServerName}" == "${NTPServerName}" ] ; then e=1 ; break ; fi ; done
-	if [ ${e} -eq 0 ] ; then NTPServerNames=( "${NTPServerNames[@]}" "${NTPServerName}" ) ; fi
+	j=0 ; for ServerName in "${NTPServerNames[@]}" ; do if [ "${ServerName}" == "${NTPServerName}" ] ; then j=1 ; break ; fi ; done
+	if [ ${j} -eq 0 ] ; then NTPServerNames=( "${NTPServerNames[@]}" "${NTPServerName}" ) ; fi
 }
 
 function set_NTPServer {
@@ -4326,17 +4326,17 @@ function set_TimeZone {
 
 function refresh_GeonameID {
 	set_UseGeoKit
-	e=0
+	j=0
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		for Item in "${all_cities_adj_7[@]}" ; do
-			if [ "${Item}" == "${GeonameID}" ] ; then e=1 ; fi
+			if [ "${Item}" == "${GeonameID}" ] ; then j=1 ; fi
 		done
 	else
 		Query="select ZGEONAMEID from ${PLACES} where ZGEONAMEID = ${GeonameID};"
 		ZGEONAMEID=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
-		if [ -n "${ZGEONAMEID}" ] ; then e=1 ; fi
+		if [ -n "${ZGEONAMEID}" ] ; then j=1 ; fi
 	fi
-	if [ ${e} -eq 0 ] ; then
+	if [ ${j} -eq 0 ] ; then
 		if [ -n "${TZCountryCode}" ] ; then
 			set_DefaultGeonameID "${TZCountryCode}"
 		else
@@ -4354,14 +4354,14 @@ function set_CountryTimeZones {
 	unset CountryTZFiles[@]
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		i=0 ; while [ ${i} -lt ${#all_cities_adj_4[@]} ] ; do
-			a=0
+			j=0
 			if [ "${all_cities_adj_4[i]}" == "${1}" ] ; then
-				a=1
+				j=1
 				for TZFILE in "${CountryTZFiles[@]}" ; do
-					if [ "${TZFILE}" == "${all_cities_adj_3[i]}" ] ; then a=0 ; break ; fi
+					if [ "${TZFILE}" == "${all_cities_adj_3[i]}" ] ; then j=0 ; break ; fi
 				done
 			fi
-			if [ ${a} -eq 1 ] ; then CountryTZFiles=( "${CountryTZFiles[@]}" "${all_cities_adj_3[i]}" ) ; fi
+			if [ ${j} -eq 1 ] ; then CountryTZFiles=( "${CountryTZFiles[@]}" "${all_cities_adj_3[i]}" ) ; fi
 			let i++
 		done
 	else
@@ -4377,11 +4377,11 @@ function set_CountryTimeZones {
 	unset CountryTimeZones[@]
 	for TZFILE in "${CountryTZFiles[@]}" ; do
 		TZFILETIMEZONE=$(set_TimeZone "${TZFILE}")
-		a=1
+		j=1
 		for TIMEZONE in "${CountryTimeZones[@]}" ; do
-			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then a=0 ; fi
+			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then j=0 ; fi
 		done
-		if [ ${a} -eq 1 ] ; then CountryTimeZones=( "${CountryTimeZones[@]}" "${TZFILETIMEZONE}" ) ; fi
+		if [ ${j} -eq 1 ] ; then CountryTimeZones=( "${CountryTimeZones[@]}" "${TZFILETIMEZONE}" ) ; fi
 	done
 	IFS=$'\n'
 	CountryTimeZones=( `for TIMEZONE in "${CountryTimeZones[@]}" ; do echo "${TIMEZONE}" ; done | sort -u` )
@@ -4395,12 +4395,12 @@ function set_AllTimeZones {
 	s=1
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		i=0 ; while [ ${i} -lt ${#all_cities_adj_3[@]} ] ; do
-			a=1
+			j=1
 			for TZFILE in "${AllTZFiles[@]}" ; do
-				if [ "${TZFILE}" == "${all_cities_adj_3[i]}" ] ; then a=0 ; break ; fi
+				if [ "${TZFILE}" == "${all_cities_adj_3[i]}" ] ; then j=0 ; break ; fi
 				printf "\b${spin:s++%${#spin}:1}"
 			done
-			if [ ${a} -eq 1 ] ; then AllTZFiles=( "${AllTZFiles[@]}" "${all_cities_adj_3[i]}" ) ; fi
+			if [ ${j} -eq 1 ] ; then AllTZFiles=( "${AllTZFiles[@]}" "${all_cities_adj_3[i]}" ) ; fi
 			let i++
 		done
 	else
@@ -4410,12 +4410,12 @@ function set_AllTimeZones {
 	unset AllTimeZones[@]
 	for TZFILE in "${AllTZFiles[@]}" ; do
 		TZFILETIMEZONE=$(set_TimeZone "${TZFILE}")
-		a=1
+		j=1
 		for TIMEZONE in "${AllTimeZones[@]}" ; do
-			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then a=0 ; fi
+			if [ "${TZFILETIMEZONE}" == "${TIMEZONE}" ] ; then j=0 ; fi
 			printf "\b${spin:s++%${#spin}:1}"
 		done
-		if [ ${a} -eq 1 ] ; then AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" ) ; fi
+		if [ ${j} -eq 1 ] ; then AllTimeZones=( "${AllTimeZones[@]}" "${TZFILETIMEZONE}" ) ; fi
 	done
 	printf "\bdone\n"
 }
@@ -4424,10 +4424,10 @@ function set_OtherTimeZones {
 	set_AllTimeZones
 	unset OtherTimeZones[@]
 	for TIMEZONE in "${AllTimeZones[@]}" ; do
-		e=0 ; for COUNTRYTIMEZONE in "${CountryTimeZones[@]}" ; do
-			if [ "${TIMEZONE}" == "${COUNTRYTIMEZONE}" ] ; then e=1 ; break ; fi
+		j=0 ; for COUNTRYTIMEZONE in "${CountryTimeZones[@]}" ; do
+			if [ "${TIMEZONE}" == "${COUNTRYTIMEZONE}" ] ; then j=1 ; break ; fi
 		done
-		if [ ${e} -eq 0 ] ; then OtherTimeZones=( "${OtherTimeZones[@]}" "${TIMEZONE}" ) ; fi
+		if [ ${j} -eq 0 ] ; then OtherTimeZones=( "${OtherTimeZones[@]}" "${TIMEZONE}" ) ; fi
 	done
 	IFS=$'\n'
 	OtherTimeZones=( `for TIMEZONE in "${OtherTimeZones[@]}" ; do echo "${TIMEZONE}" ; done | sort -u` )
@@ -4570,12 +4570,12 @@ function set_TZCountries {
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		for TZFILE in "${TZFiles[@]}" ; do
 			i=0 ; for Item in "${all_cities_adj_3[@]}" ; do
-				a=0
-				if [ "${TZFILE}" == "${Item}" ] ; then a=1 ; fi
+				j=0
+				if [ "${TZFILE}" == "${Item}" ] ; then j=1 ; fi
 				for CODE in "${ZCODES[@]}" ; do
-					if [ "${CODE}" == "${all_cities_adj_4[i]}" ] ; then a=0 ; break ; fi
+					if [ "${CODE}" == "${all_cities_adj_4[i]}" ] ; then j=0 ; break ; fi
 				done
-				if [ ${a} -eq 1 ] ; then ZCODES=( "${ZCODES[@]}" "${all_cities_adj_4[i]}" ) ; fi
+				if [ ${j} -eq 1 ] ; then ZCODES=( "${ZCODES[@]}" "${all_cities_adj_4[i]}" ) ; fi
 				let i++
 			done
 		done
@@ -4584,13 +4584,13 @@ function set_TZCountries {
 			Query="select distinct ZCOUNTRY from ${PLACES} where ZTIMEZONENAME = '${TZFILE}';"
 			ZCOUNTRYS=( `sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null` )
 			for ZCOUNTRY in "${ZCOUNTRYS[@]}" ; do
-				a=1
+				j=1
 				Query="select ZCODE from ${PLACES} where Z_PK = ${ZCOUNTRY};"
 				ZCODE=`sqlite3 "${GeoKitFramework}" "${Query}" 2>/dev/null`
 				for CODE in "${ZCODES[@]}" ; do
-					if [ "${ZCODE}" == "${CODE}" ] ; then a=0 ; break ; fi
+					if [ "${ZCODE}" == "${CODE}" ] ; then j=0 ; break ; fi
 				done
-				if [ ${a} -eq 1 ] ; then ZCODES=( "${ZCODES[@]}" "${ZCODE}" ) ; fi
+				if [ ${j} -eq 1 ] ; then ZCODES=( "${ZCODES[@]}" "${ZCODE}" ) ; fi
 			done
 		done
 	fi
@@ -4612,15 +4612,15 @@ function set_ClosestCities {
 	s=1
 	if [ ${UseGeoKit} -eq 0 ] ; then
 		for TZFILE in "${TZFiles[@]}" ; do
-			a=0
+			j=0
 			i=0 ; for Item in "${all_cities_adj_3[@]}" ; do
 				if [ "${TZFILE}" == "${Item}" ] ; then
-					if [ "${1}" == "${all_cities_adj_4[i]}" ] ; then a=1 ; break ; fi
+					if [ "${1}" == "${all_cities_adj_4[i]}" ] ; then j=1 ; break ; fi
 				fi
 				printf "\b${spin:s++%${#spin}:1}"
 				let i++
 			done
-			if [ ${a} -eq 1 ] ; then ZGEONAMEIDS=( ${ZGEONAMEIDS[@]} ${all_cities_adj_7[i]} ) ; fi
+			if [ ${j} -eq 1 ] ; then ZGEONAMEIDS=( ${ZGEONAMEIDS[@]} ${all_cities_adj_7[i]} ) ; fi
 		done
 	else
 		Query="select Z_PK from ${PLACES} where ZCODE = '${1}';"
@@ -4973,18 +4973,24 @@ function select_RemoteManagement {
 }
 
 function display_ComputerName {
-	printf "Computer Name:		${ComputerName}\n\n"
+	printf "Computer Name:		"
+	if [ -n "${ComputerName}" ] ; then printf "${ComputerName}" ; else printf "-" ; fi
+	printf "\n\n"
 }
 
 function select_ComputerName {
-	ComputerNames=( "Model and MAC Address" "Serial Number" )
+	ComputerNames=( "Do not set" "Model and MAC Address" "Serial Number" )
 	display_Subtitle "Computer Name"
 	display_ComputerName
 	display_Options "Naming conventions" "Select the naming convention you wish to use: "
 	select newComputerName in "${ComputerNames[@]}" ; do
 		if [ -n "${newComputerName}" ] ; then break ; fi
 	done
-	ComputerName="${newComputerName}"
+	if [ "${newComputerName}" == "Do not set" ] ; then
+		unset ComputerName
+	else
+		ComputerName="${newComputerName}"
+	fi
 	unset newComputerName
 }
 
@@ -5077,21 +5083,21 @@ function check_AccountTypes {
 function update_RealName {
 	# ${1}: RealName
 	RealName="${1}"
-	i=0
+	j=0
 	if check_AttributeReserved "RealName" "${RealName}" ; then
 		while [ ${?} -ne 1 ] ; do
-			let i++
-			check_AttributeReserved "RealName" "${RealName}${i}"
+			let j++
+			check_AttributeReserved "RealName" "${RealName}${j}"
 		done
 	fi
-	if check_AttributeInUse "RealName" "${RealName}" || check_AttributeInUse "RealName" "${RealName}${i}" ; then
+	if check_AttributeInUse "RealName" "${RealName}" || check_AttributeInUse "RealName" "${RealName}${j}" ; then
 		while [ ${?} -ne 1 ] ; do
-			let i++
-			check_AttributeInUse "RealName" "${RealName}${i}"
+			let j++
+			check_AttributeInUse "RealName" "${RealName}${j}"
 		done
 	fi
 	if check_AttributeReserved "RealName" "${RealName}" || check_AttributeInUse "RealName" "${RealName}" ; then
-		RealName="${RealName}${i}"
+		RealName="${RealName}${j}"
 	fi
 }
 
@@ -5834,7 +5840,7 @@ function load_Configuration {
 	RemoteManagement=`defaults read "${ConfigurationFolder}/${Configuration}" "RemoteManagement" 2>/dev/null`
 	if [ ${?} -ne 0 ] ; then RemoteManagement=0 ; fi
 	ComputerName=`defaults read "${ConfigurationFolder}/${Configuration}" "ComputerName" 2>/dev/null`
-	if [ ${?} -ne 0 ] ; then ComputerName="Model and MAC Address" ; fi
+	if [ ${?} -ne 0 ] ; then unset ComputerName ; fi
 	unset UserWarnings[@]
 	unset AccountTypes[@]
 	unset RealNames[@]
@@ -5897,6 +5903,7 @@ function save_Configuration {
 		done
 	fi
 	Configuration="${ConfigurationName}"
+	if [ -e "${ConfigurationFolder}/${Configuration}.plist" ] ; then rm "${ConfigurationFolder}/${Configuration}.plist" ; fi
 	defaults write "${ConfigurationFolder}/${Configuration}" "Language" -string "${Language}"
 	defaults write "${ConfigurationFolder}/${Configuration}" "SACountryCode" -string "${SACountryCode}"
 	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
@@ -5929,24 +5936,14 @@ function save_Configuration {
 		defaults write "${ConfigurationFolder}/${Configuration}" "RemoteManagement" -bool FALSE
 	fi
 	defaults write "${ConfigurationFolder}/${Configuration}" "ComputerName" -string "${ComputerName}"
-	defaults delete "${ConfigurationFolder}/${Configuration}" "Users" 2>/dev/null
-	/usr/libexec/PlistBuddy -c "Add :Users array" "${ConfigurationFolder}/${Configuration}.plist"
-	i=0 ; for Element in "${AccountTypes[@]}" ; do
-		/usr/libexec/PlistBuddy -c "Add :Users:${i} dict" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:type string ${AccountTypes[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:realname string ${RealNames[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:name string ${RecordNames[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:passwd string ${Passwords[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:hint string ${AuthenticationHints[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:uid integer ${UniqueIDs[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:shell string ${UserShells[i]}" "${ConfigurationFolder}/${Configuration}.plist"
-		/usr/libexec/PlistBuddy -c "Add :Users:${i}:home string ${NFSHomeDirectories[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+	defaults write "${ConfigurationFolder}/${Configuration}" "Users" -array
+	i=0 ; for Account in "${AccountTypes[@]}" ; do
+		defaults write "${ConfigurationFolder}/${Configuration}" "Users" -array-add "{ \"type\" = \"${AccountTypes[i]}\"; \"realname\" = \"${RealNames[i]}\"; \"name\" = \"${RecordNames[i]}\"; \"passwd\" = \"${Passwords[i]}\"; \"hint\" = \"${AuthenticationHints[i]}\"; \"uid\" = \"${UniqueIDs[i]}\"; \"shell\" = \"${UserShells[i]}\"; \"home\" = \"${NFSHomeDirectories[i]}\"; }"
 		let i++
 	done
-	defaults delete "${ConfigurationFolder}/${Configuration}" "Packages" 2>/dev/null
-	/usr/libexec/PlistBuddy -c "Add :Packages array" "${ConfigurationFolder}/${Configuration}.plist"
-	i=0 ; for Element in "${Packages[@]}" ; do
-		/usr/libexec/PlistBuddy -c "Add :Packages:${i} string ${Packages[i]}" "${ConfigurationFolder}/${Configuration}.plist"
+	defaults write "${ConfigurationFolder}/${Configuration}" "Packages" -array
+	i=0 ; for Package in "${Packages[@]}" ; do
+		defaults write "${ConfigurationFolder}/${Configuration}" "Packages" -array-add "${Package}"
 		let i++
 	done
 }
@@ -5989,8 +5986,8 @@ function apply_Configuration {
 		# echo "RecoveryName:	${RecoveryName}"
 		# echo
 		# End: Debug Output
+		unset Overwrite
 		if [ -e "${MasterFolder}/${MasterName}" ] ; then
-			unset Overwrite
 			while [ -n "${Overwrite}" ] ; do
 				printf "An image named \033[1m${MasterName}\033[m already exists.\n"
 				read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty
@@ -6364,22 +6361,24 @@ function apply_Configuration {
 	# cat "${Target}/${FirstBootPath}/FirstBoot.sh"
 	# printf "\n"
 	# End: Debug Output
-	printf "Creating:	${FirstBootPath}/Actions/ComputerName.sh\n"
-	printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	case "${ComputerName}" in
-		"Model and MAC Address" )
-			echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" \'{print \$NF}\'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
-			echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk \'{print \$NF}\' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
-			echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
-		"Serial Number" )
-			echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
-	esac
-	echo "LocalHostName=\"\${ComputerName// /-}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	echo "/usr/sbin/scutil --set ComputerName \"\${ComputerName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	echo "/usr/sbin/scutil --set LocalHostName \"\${LocalHostName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	chown 0:0 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-	chmod 755 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	if [ -n "${ComputerName}" ] ; then
+		printf "Creating:	${FirstBootPath}/Actions/ComputerName.sh\n"
+		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		case "${ComputerName}" in
+			"Model and MAC Address" )
+				echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" \'{print \$NF}\'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk \'{print \$NF}\' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+			"Serial Number" )
+				echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+		esac
+		echo "LocalHostName=\"\${ComputerName// /-}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		echo "/usr/sbin/scutil --set ComputerName \"\${ComputerName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		echo "/usr/sbin/scutil --set LocalHostName \"\${LocalHostName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		chown 0:0 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		chmod 755 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+	fi
 	# Begin: Debug Output
 	# cat "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 	# printf "\n"
