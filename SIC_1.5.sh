@@ -38,7 +38,7 @@ RemoteLogin=0
 RemoteManagement=0
 
 # Version
-SICVersion="1.5b4"
+SICVersion="1.5b6"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -93,9 +93,10 @@ function get_SystemOSVersion {
 }
 
 function get_LocalUsers {
-	unset LocalRecordNames
-	unset LocalRealNames
-	unset LocalUniqueIDs
+	unset LocalRecordNames[@]
+	unset LocalRealNames[@]
+	unset LocalUniqueIDs[@]
+	unset LocalNFSHomeDirectories[@]
 	LocalUsers=( `dscl -f "/var/db/dslocal/nodes/Default" localonly -list /Local/Target/Users` )
 	i=0 ; for Element in "${LocalUsers[@]}" ; do
 		AuthenticationAuthority=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "AuthenticationAuthority" 2>/dev/null`
@@ -904,9 +905,6 @@ function create_Image {
 				install_Package "/Volumes/${SourceVolume}/System/Installation/Packages/OSInstall.mpkg" "${Target}" ${InstallType}
 			else
 				install_Package "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" "${Target}" 0
-			fi
-			if [ "${1}" != "/Volumes/${SourceVolume}/Packages/OSInstall.mpkg" ] ; then
-				press_anyKey
 			fi
 			bless --folder "${Target}/System/Library/CoreServices" --bootefi 2>/dev/null
 			touch "${Target}/private/var/db/.RunLanguageChooserToo"
