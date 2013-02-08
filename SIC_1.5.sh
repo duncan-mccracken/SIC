@@ -38,7 +38,7 @@ RemoteLogin=0
 RemoteManagement=0
 
 # Version
-SICVersion="1.5b6"
+SICVersion="1.5b7"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -105,7 +105,7 @@ function get_LocalUsers {
 			LocalRealNames[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "RealName" 2>/dev/null | grep -v "RealName:" | sed "s/^ *//g"`
 			LocalUniqueIDs[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "UniqueID" 2>/dev/null | awk -F "UniqueID: " '{print $NF}'`
 			LocalNFSHomeDirectories[i]=`dscl -f "/var/db/dslocal/nodes/Default" localonly -read /Local/Target/Users/${Element} "NFSHomeDirectory" 2>/dev/null | awk -F "NFSHomeDirectory: " '{print $NF}'`
-		let i++
+			let i++
 		fi
 	done
 }
@@ -911,7 +911,7 @@ function create_Image {
 			for Removable in "${Removables[@]}" ; do
 				if [ -e "${Target}/${Removable}" ] ; then rm -rf "${Target}/${Removable}" ; fi
 			done
-			Device=`diskutil info "${Target}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			Device=`diskutil info "${Target}" | grep "Part of Whole:" | awk '{print $NF}'`
 			diskutil unmountDisk force "/dev/${Device}" &>/dev/null
 			printf "Unmount of all volumes on ${Device} was successful\n"
 			diskutil eject "/dev/${Device}" &>/dev/null
@@ -924,7 +924,7 @@ function create_Image {
 			for Removable in "${Removables[@]}" ; do
 				if [ -e "/Volumes/${SourceVolume}/${Removable}" ] ; then rm -rf "/Volumes/${SourceVolume}/${Removable}" ; fi
 			done
-			Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Part of Whole:" | awk -F " " '{print $NF}'`
+			Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Part of Whole:" | awk '{print $NF}'`
 			DeviceNodes=`diskutil list "/dev/${Device}" | grep -c "Apple_HFS"`
 			if [ ${DeviceNodes} -gt 1 ] ; then
 				Device=`diskutil info "/Volumes/${SourceVolume}" | grep "Device Node:" | awk -F "/dev/" '{print $NF}'`
@@ -985,7 +985,8 @@ function get_Volumes {
 		if [ ! -e "/Volumes/${Volume}/System/Library/CoreServices/SystemVersion.plist" ] || [ -e "/Volumes/${Volume}/var/db/.AppleSetupDone" ] || [ -e "/Volumes/${Volume}/System/Installation/Packages/OSInstall.mpkg" ] || [ -e "/Volumes/${Volume}/Packages/OSInstall.mpkg" ] ; then
 			unset Volumes[i]
 		fi
-		if [ $( diskutil info "/Volumes/${Volume}" | grep "Read-Only Volume:" | awk -F " " '{print $NF}' ) == "Yes" ] ; then
+		ReadOnly=`diskutil info "/Volumes/${Volume}" | grep "Read-Only Volume:" | awk '{print $NF}'`
+		if [ "${ReadOnly}" == "Yes" ] ; then
 			unset Volumes[i]
 		fi
 		let i++
@@ -5968,9 +5969,19 @@ function apply_Configuration {
 		press_anyKey "No target selected, please select a target first."
 		return 0
 	fi
+	unset NoUser
 	if [ ${#RecordNames[@]} -eq 0 ] ; then
-		press_anyKey "No users created, please add a user first."
-		return 0
+		while [ -z "${NoUser}" ] ; do
+			printf "No user accounts have been created.\n"
+			read -sn 1 -p "Are you sure you want to proceed (y/N)? " NoUser < /dev/tty
+			echo
+			if [ -z "${NoUser}" ] ; then NoUser="n" ; fi
+			case "${NoUser}" in
+				"Y" | "y" ) echo ; break ;;
+				"N" | "n" ) return 0 ;;
+				* ) unset NoUser ;;
+			esac
+		done
 	fi
 	if [ ${TargetType} -eq 2 ] ; then
 		if [ -e "${LibraryFolder}/${TargetName}.shadow" ] ; then rm -f "${LibraryFolder}/${TargetName}.shadow" ; fi
@@ -5986,7 +5997,7 @@ function apply_Configuration {
 		# End: Debug Output
 		unset Overwrite
 		if [ -e "${MasterFolder}/${MasterName}" ] ; then
-			while [ -n "${Overwrite}" ] ; do
+			while [ -z "${Overwrite}" ] ; do
 				printf "An image named \033[1m${MasterName}\033[m already exists.\n"
 				read -sn 1 -p "Would you like to overwrite it (y/N)? " Overwrite < /dev/tty
 				echo
@@ -5998,14 +6009,17 @@ function apply_Configuration {
 				esac
 			done
 		fi
-		hdiutil eject "${Target}" &>/dev/null
+		hdiutil eject "${Target}" -force &>/dev/null
+		while [ -e "${Target}" ] ; do
+			sleep 1
+		done
 		IFS=$'\n'
 		TargetVolumes=( `hdiutil attach -owners on -noverify "${LibraryFolder}/${TargetName}" -shadow | grep "/Volumes/" | awk -F "/Volumes/" '{print $NF}'` )
 		unset IFS
 		set_Target "${TargetVolumes[0]}"
 	fi
 	set_Localization "${Language}"
-	printf "Updating:	/Library/Preferences/.GlobalPreferences.plist\n"
+	printf "Creating:	/Library/Preferences/.GlobalPreferences.plist\n"
 	if [ -e "${Target}/Library/Preferences/.GlobalPreferences.plist" ] ; then
 		rm -f "${Target}/Library/Preferences/.GlobalPreferences.plist"
 	fi
@@ -6344,8 +6358,8 @@ function apply_Configuration {
 	echo "for Action in \"\${Actions[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "	\"\${ScriptPath}/Actions/\${Action}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "done" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Minor=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" \'{print \$2}\'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Point=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" \'{print \$3}\'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Minor=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" '{print \$2}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Point=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" '{print \$3}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "if [ \${Minor} -eq 7 -a \${Point} -gt 3 ] || [ \${Minor} -gt 7 ] ; then GateKeeper=\"-allowUntrusted\" ; fi" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "for Package in \"\${Packages[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "	/usr/sbin/installer -dumplog \"\${GateKeeper}\" -pkg \"\${ScriptPath}/Packages/\${Package}\" -target / 2>/dev/null" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
@@ -6364,8 +6378,8 @@ function apply_Configuration {
 		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 		case "${ComputerName}" in
 			"Model and MAC Address" )
-				echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" \'{print \$NF}\'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
-				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk \'{print \$NF}\' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk '{print \$NF}' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
 				echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 			"Serial Number" )
 				echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
@@ -6742,11 +6756,13 @@ function apply_Configuration {
 		done
 		case ${ExportType} in
 			1 )
-				hdiutil eject "${Target}" &>/dev/null ;
+				hdiutil eject "${Target}" -force &>/dev/null ;
+				while [ -e "${Target}" ] ; do sleep 1 ; done ;
 				hdiutil convert -format UDZO "${LibraryFolder}/${TargetName}" -shadow "${LibraryFolder}/${TargetName}.shadow" -o "${MasterFolder}/${MasterName}" ;;
 			2 )
 				hdiutil create -srcfolder "${Target}" -layout SPUD "${MasterFolder}/${MasterName}" ;
-				hdiutil eject "${Target}" &>/dev/null ;;
+				hdiutil eject "${Target}" -force &>/dev/null ;
+				while [ -e "${Target}" ] ; do sleep 1 ; done ;;
 			3 )
 				printf "Initializing…\n"
 				printf "Creating…\n"
@@ -6757,7 +6773,8 @@ function apply_Configuration {
 					hdiutil unmount "/dev/${TargetDevice}s3" &>/dev/null
 					hdiutil create -srcdevice "/dev/${TargetDevice}s3" "${MasterFolder}/${RecoveryName}" ;
 				fi
-				hdiutil eject "${Target}" &>/dev/null ;;
+				hdiutil eject "${Target}" -force &>/dev/null ;
+				while [ -e "${Target}" ] ; do sleep 1 ; done ;;
 		esac
 		printf "\n"
 		printf "Scanning Image(s) for Restore\n"
