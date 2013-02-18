@@ -28,7 +28,6 @@ FirstBootPath="/usr/libexec/FirstBoot"
 Language="English"
 SACountryCode="US"
 InputSourceID="US"
-LocationServices=0
 NTPServerName="Apple Americas/U.S. (time.apple.com)"
 NTPServer="time.apple.com"
 NTPEnabled=1
@@ -3648,8 +3647,6 @@ function set_InputSourceID {
 	esac
 }
 
-# Section: Location Services
-
 # Section: NTP Settings
 
 function set_NTPServerName {
@@ -4754,36 +4751,6 @@ function select_Keyboard {
 	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
 }
 
-function display_LocationServices {
-	printf "Location Services:	"
-	printf "["
-	if [ ${LocationServices} -eq 1 ] ; then
-		if [ ${TargetOSMinor} -lt 8 ] ; then printf "-" ; else printf "*" ; fi
-	else
-		printf " "
-	fi
-	printf "] Enable Location Services on this Mac\n\n"
-}
-
-function set_LocationServices {
-	display_Subtitle "Location Services"
-	display_LocationServices
-	if [ ${TargetOSMinor} -lt 8 ] ; then
-		echo "Note:	This setting only applies to Mac OS X 10.8 or greater"
-		echo
-	fi
-	while [ -z "${EnableLS}" ] ; do
-		read -sn 1 -p "Enable Location Services on this Mac (y/N)? " EnableLS < /dev/tty
-		if [ -z "${EnableLS}" ] ; then EnableLS="n" ; fi
-		case "${EnableLS}" in
-			"Y" | "y" ) echo ; LocationServices=1 ;;
-			"N" | "n" ) echo ; LocationServices=0 ;;
-			* ) echo ; unset EnableLS ;;
-		esac
-	done
-	unset EnableLS
-}
-
 function display_NTPSettings {
 	printf "Network Time Server:	"
 	if [ -n "${NTPServerName}" ] ; then printf "${NTPServerName}" ; else printf "-" ; fi
@@ -4841,7 +4808,7 @@ function display_TimeZone {
 	printf "\n"
 	printf "			["
 	if [ ${TZAuto} -eq 1 ] ; then
-		if [ ${TargetOSMinor} -lt 6 ] || [ ${TargetOSMinor} -gt 7 ] ; then printf "-" ; else printf "*" ; fi
+		printf "*"
 	else
 		printf " "
 	fi
@@ -4914,10 +4881,6 @@ function select_TimeZone {
 	while [ -z "${AutoTZ}" ] ; do
 		display_Subtitle "Select Time Zone"
 		display_TimeZone
-		if [ ${TargetOSMinor} -lt 6 ] || [ ${TargetOSMinor} -gt 7 ] ; then
-			echo "Note:	This setting only applies to Mac OS X 10.6 or 10.7"
-			echo
-		fi
 		read -sn 1 -p "Set time zone automatically using current location (Y/n)? " AutoTZ < /dev/tty
 		if [ -z "${AutoTZ}" ] ; then AutoTZ="y" ; fi
 		case "${AutoTZ}" in
@@ -4978,7 +4941,7 @@ function display_ComputerName {
 }
 
 function select_ComputerName {
-	ComputerNames=( "Do not set" "Model and MAC Address" "Serial Number" )
+	ComputerNames=( "Do not set" "Model and MAC Address" "Generic using MAC Address" "Serial Number" )
 	display_Subtitle "Computer Name"
 	display_ComputerName
 	display_Options "Naming conventions" "Select the naming convention you wish to use: "
@@ -4997,7 +4960,6 @@ function display_SystemSettings {
 	display_Language
 	display_CountryName
 	display_Keyboard
-	display_LocationServices
 	display_NTPSettings
 	display_TimeZone
 	display_RemoteLogin
@@ -5006,7 +4968,7 @@ function display_SystemSettings {
 }
 
 function menu_SystemPreferences {
-	SystemOptions=( "System Setup Menu" "Language" "Country" "Keyboard" "Location Services" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
+	SystemOptions=( "System Setup Menu" "Language" "Country" "Keyboard" "Network Time Server" "Time Zone" "Remote Login" "Remote Management" "Computer Name" )
 	while [ "${Option}" != "System Setup Menu" ] ; do
 		display_Subtitle "System Preferences"
 		display_SystemSettings
@@ -5017,7 +4979,6 @@ function menu_SystemPreferences {
 				"Language" ) select_Language ; unset Option ; break ;;
 				"Country" ) select_Country ; unset Option ; break ;;
 				"Keyboard" ) select_Keyboard ; unset Option ; break ;;
-				"Location Services" ) set_LocationServices ; unset Option ; break ;;
 				"Network Time Server" ) select_NTPServer ; unset Option ; break ;;
 				"Time Zone" ) select_TimeZone ; unset Option ; break ;;
 				"Remote Login" ) select_RemoteLogin ; unset Option ; break ;;
@@ -5785,7 +5746,6 @@ function new_Configuration {
 	refresh_Country
 	InputSourceID="US"
 	refresh_Keyboard
-	LocationServices=0
 	NTPServer="time.apple.com"
 	set_NTPServerName "${NTPServer}"
 	NTPEnabled=1
@@ -5823,8 +5783,6 @@ function load_Configuration {
 	refresh_Country
 	InputSourceID=`defaults read "${ConfigurationFolder}/${Configuration}" "InputSourceID" 2>/dev/null`
 	refresh_Keyboard
-	LocationServices=`defaults read "${ConfigurationFolder}/${Configuration}" "LocationServices" 2>/dev/null`
-	if [ ${?} -ne 0 ] ; then LocationServices=0 ; fi
 	NTPEnabled=`defaults read "${ConfigurationFolder}/${Configuration}" "NTPEnabled" 2>/dev/null`
 	if [ -z "${NTPEnabled}" ] ; then NTPEnabled=1 ; fi
 	NTPServer=`defaults read "${ConfigurationFolder}/${Configuration}" "NTPServer" 2>/dev/null`
@@ -5907,11 +5865,6 @@ function save_Configuration {
 	defaults write "${ConfigurationFolder}/${Configuration}" "SACountryCode" -string "${SACountryCode}"
 	set_InputSourceID "${SAKeyboard}" "${SATypingStyle}"
 	defaults write "${ConfigurationFolder}/${Configuration}" "InputSourceID" -string "${InputSourceID}"
-	if [ ${LocationServices} -eq 1 ] ;then
-		defaults write "${ConfigurationFolder}/${Configuration}" "LocationServices" -bool TRUE
-	else
-		defaults write "${ConfigurationFolder}/${Configuration}" "LocationServices" -bool FALSE
-	fi
 	if [ ${NTPEnabled} -eq 1 ] ;then
 		defaults write "${ConfigurationFolder}/${Configuration}" "NTPEnabled" -bool TRUE
 	else
@@ -6018,6 +5971,7 @@ function apply_Configuration {
 		unset IFS
 		set_Target "${TargetVolumes[0]}"
 	fi
+	vsdbutil -a "${Target}"
 	set_Localization "${Language}"
 	printf "Creating:	/Library/Preferences/.GlobalPreferences.plist\n"
 	if [ -e "${Target}/Library/Preferences/.GlobalPreferences.plist" ] ; then
@@ -6381,6 +6335,9 @@ function apply_Configuration {
 				echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
 				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk '{print \$NF}' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
 				echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+			"Generic using MAC Address" )
+				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk '{print \$NF}' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "ComputerName=\"Mac \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 			"Serial Number" )
 				echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 		esac
@@ -6395,26 +6352,34 @@ function apply_Configuration {
 	# cat "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 	# printf "\n"
 	# End: Debug Output
-	if [ ${LocationServices} -eq 1 ] && [ ${TargetOSMinor} -ge 8 ] ; then
-		printf "Creating:	${FirstBootPath}/Actions/LocationServices.sh\n"
-		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c51-62 | awk {'print tolower()'}\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "else" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-62\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "fi" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "mkdir -p \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"ObsoleteDataDeleted\" -bool TRUE" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.notbackedup.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "chown -Rh 205:205 \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		chown 0:0 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		chmod 755 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
-		# Begin: Debug Output
-		# cat "${Target}/usr/libexec/FirstBoot/Actions/LocationServices.sh"
-		# printf "\n"
-		# End: Debug Output
+	if [ ${TargetOSMinor} -ge 6 ] ; then
+		if [ ${TZAuto} -eq 1 ] ;then
+			printf "Creating:	/Library/Preferences/com.apple.timezone.auto.plist\n"
+			defaults write "${Target}/Library/Preferences/com.apple.timezone.auto" "Active" -bool TRUE
+			chown 0:0 "${Target}/Library/Preferences/com.apple.timezone.auto.plist"
+			chmod 644 "${Target}/Library/Preferences/com.apple.timezone.auto.plist"
+			if [ ${TargetOSMinor} -ge 8 ] ; then
+				printf "Creating:	${FirstBootPath}/Actions/LocationServices.sh\n"
+				printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "if [ \`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-50\` == \"00000000-0000-1000-8000-\" ] ; then" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c51-62 | awk {'print tolower()'}\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "else" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "	UUID=\`ioreg -rd1 -c IOPlatformExpertDevice | grep -i \"UUID\" | cut -c27-62\`" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "fi" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "mkdir -p \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"ObsoleteDataDeleted\" -bool TRUE" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "defaults write \"/private/var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.notbackedup.\${UUID}\" \"LocationServicesEnabled\" -int 1" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "chown -Rh 205:205 \"/private/var/db/locationd/Library/Preferences/ByHost\"" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				chown 0:0 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				chmod 755 "${Target}/${FirstBootPath}/Actions/LocationServices.sh"
+				# Begin: Debug Output
+				# cat "${Target}/usr/libexec/FirstBoot/Actions/LocationServices.sh"
+				# printf "\n"
+				# End: Debug Output
+			fi
+		fi
 	fi
 	if [ ${RemoteManagement} -eq 1 ] ; then
 		printf "Creating:	/Library/Preferences/com.apple.RemoteManagement.plist\n"
@@ -6581,6 +6546,7 @@ function apply_Configuration {
 	fi
 	if [ ${#RemovableItems[@]} -gt 0 ] ; then
 		for Item in "${RemovableItems[@]}" ; do
+			unset bundleID
 			case "${Item}" in
 				"iPhoto" )
 					Removables=(
@@ -6603,6 +6569,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iPhotoLibraryUpgradeTool.bom"
 						"var/db/receipts/com.apple.pkg.iPhotoLibraryUpgradeTool.plist"
 					) ;
+					bundleID="com.apple.iPhoto" ;
 					if [ -e "${Target}/Applications/iPhoto.app" ] ; then echo "Removing:	iPhoto" ; fi ;;
 				"iMovie" )
 					Removables=(
@@ -6613,6 +6580,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iMovie.bom"
 						"var/db/receipts/com.apple.pkg.iMovie.plist"
 					) ;
+					bundleID="com.apple.iMovieApp" ;
 					if [ -e "${Target}/Applications/iMovie.app" ] ; then echo "Removing:	iMovie" ; fi ;;
 				"iDVD" )
 					Removables=(
@@ -6672,6 +6640,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.GarageBandFactoryContent.bom"
 						"var/db/receipts/com.apple.pkg.GarageBandFactoryContent.plist"
 					) ;
+					bundleID="com.apple.garageband" ;
 					if [ -e "${Target}/Applications/GarageBand.app" ] ; then echo "Removing:	GarageBand" ; fi ;;
 				"Sounds & Jingles" )
 					Removables=(
@@ -6703,6 +6672,17 @@ function apply_Configuration {
 					rm -rf "${Target}/${Removable}"
 				fi
 			done
+			if [ -n "${bundleID}" ] ; then
+				i=0 ; while : ; do
+					MASbundleID=`/usr/libexec/PlistBuddy -c "Print :${i}:bundleID" "${Target}/var/db/.MASManifest" 2>/dev/null`
+					if [ ${?} -ne 0 ] ; then break ; fi
+					if echo "${MASbundleID}" | grep -q "${bundleID}" ; then
+						/usr/libexec/PlistBuddy -c "Delete :${i}" "${Target}/var/db/.MASManifest"
+						break
+					fi
+					let i++
+				done
+			fi
 		done
 		if [ -e "${Target}/Library/Receipts/iLifeCookie.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeCookie.bom" ] ; then
 			if [ ! -e "${Target}/Applications/iPhoto.app" ] && [ ! -e "${Target}/Applications/iMovie.app" ] && [ ! -e "${Target}/Applications/iDVD.app" ] && [ ! -e "${Target}/Applications/GarageBand.app" ] && [ ! -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] && [ ! -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] && [ ! -e "${Target}/Applications/iWeb.app" ] ; then
@@ -6740,8 +6720,12 @@ function apply_Configuration {
 				done
 			fi
 		fi
+		/usr/libexec/PlistBuddy -c "Print :0" "${Target}/var/db/.MASManifest" &>/dev/null
+		if [ ${?} -ne 0 ] ; then rm -f "${Target}/var/db/.MASManifest" ; fi
 		echo
 	fi
+	# Pause prior to exporting to make any additional changes
+	# press_anyKey
 	if [ ${TargetType} -eq 1 ] ; then
 		set_TargetProperties
 	fi
