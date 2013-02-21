@@ -36,8 +36,33 @@ TZAuto=0
 RemoteLogin=0
 RemoteManagement=0
 
+# Additional System Settings, menus not yet implemented
+# Display host info at login window
+AdminHostInfo=0			# 0 (Off) | 1 (On)
+# Display login window as Name and password
+ShowFullName=0			# 0 (Off) | 1 (On)
+# Allow guests to connect to shared folders
+AllowGuestAccess=1		# 1 (On)  | 0 (Off)
+# Allow managed users to add or delete printers
+ManagedUserPrinters=0	# 0 (Off) | 1 (On)
+# Automatically check for updates
+SoftwareUpdateCheck=1	# 1 (On)  | 0 (Off)
+
+# Additional User Settings, menus not yet implemented
+UserSettings=1			# 0 (Off) | 1 (On)
+# General: Show scroll bars
+AppleShowScrollBars="Always"	# Automatic | WhenScrolling | Always
+# Finder: Show Status Bar
+ShowStatusBar=TRUE
+# Finder: New Finder windows show: Computer; Volume; Home; Desktop; Documents; All My Files
+NewWindowTarget="PfHm"	# PfCm | PfVo | PfHm | PfDe | PfDo | PfAF
+# Setup Assistant: Gesture Movie
+GestureMovieSeen="trackpad"
+# iCloud Setup
+CloudSetup=0			# 1 (On)  | 0 (Off)
+
 # Version
-SICVersion="1.5b7"
+SICVersion="1.5b8"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -5837,6 +5862,13 @@ function load_Configuration {
 		Packages[i]="${Package}"
 		let i++
 	done
+	unset RemovableItems[@]
+	i=0 ; while : ; do
+		RemovableItem=`/usr/libexec/PlistBuddy -c "Print :RemovableItems:${i}" "${ConfigurationFolder}/${Configuration}.plist" 2>/dev/null`
+		if [ ${?} -ne 0 ] ; then break ; fi
+		RemovableItems[i]="${RemovableItem}"
+		let i++
+	done
 }
 
 function save_Configuration {
@@ -5893,11 +5925,8 @@ function save_Configuration {
 		defaults write "${ConfigurationFolder}/${Configuration}" "Users" -array-add "{ \"type\" = \"${AccountTypes[i]}\"; \"realname\" = \"${RealNames[i]}\"; \"name\" = \"${RecordNames[i]}\"; \"passwd\" = \"${Passwords[i]}\"; \"hint\" = \"${AuthenticationHints[i]}\"; \"uid\" = \"${UniqueIDs[i]}\"; \"shell\" = \"${UserShells[i]}\"; \"home\" = \"${NFSHomeDirectories[i]}\"; }"
 		let i++
 	done
-	defaults write "${ConfigurationFolder}/${Configuration}" "Packages" -array
-	i=0 ; for Package in "${Packages[@]}" ; do
-		defaults write "${ConfigurationFolder}/${Configuration}" "Packages" -array-add "${Package}"
-		let i++
-	done
+	defaults write "${ConfigurationFolder}/${Configuration}" "Packages" -array "${Packages[@]}"
+	defaults write "${ConfigurationFolder}/${Configuration}" "RemovableItems" -array "${RemovableItems[@]}"
 }
 
 function menu_Configurations {
@@ -6250,6 +6279,28 @@ function apply_Configuration {
 	# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/Preferences/com.apple.HIToolbox.plist"
 	# printf "\n"
 	# End: Debug Output
+	if [ ${AllowGuestAccess} -eq 0 ] ; then
+		printf "Creating:	/Library/Preferences/com.apple.AppleFileServer.plist\n"
+		defaults write "${Target}/Library/Preferences/com.apple.AppleFileServer" "guestAccess" -bool FALSE
+		chown 0:0 "${Target}/Library/Preferences/com.apple.AppleFileServer.plist"
+		chmod 644 "${Target}/Library/Preferences/com.apple.AppleFileServer.plist"
+		# Begin: Debug Output
+		# defaults read "${Target}/Library/Preferences/com.apple.AppleFileServer"
+		# printf "\n"
+		# End: Debug Output
+		printf "Creating:	/Library/Preferences/SystemConfiguration/com.apple.smb.server.plist\n"
+		defaults write "${Target}/Library/Preferences/SystemConfiguration/com.apple.smb.server" "AllowGuestAccess" -bool FALSE
+		chown 0:0 "${Target}/Library/Preferences/SystemConfiguration/com.apple.smb.server.plist"
+		chmod 644 "${Target}/Library/Preferences/SystemConfiguration/com.apple.smb.server.plist"
+		# Begin: Debug Output
+		# defaults read "${Target}/Library/Preferences/SystemConfiguration/com.apple.smb.server"
+		# printf "\n"
+		# End: Debug Output
+	fi
+	if [ ${ManagedUserPrinters} -eq 1 ] ; then
+		GeneratedUID=`dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly read /Local/Target/Groups/everyone GeneratedUID | awk '{print $NF}'`
+		dscl -f "${Target}/var/db/dslocal/nodes/Default" localonly -append /Local/Target/Groups/_lpadmin NestedGroups "${GeneratedUID}"
+	fi
 	printf "Creating:	/etc/ntp.conf\n"
 	printf "server ${NTPServer}\n" > "${Target}/etc/ntp.conf"
 	chown 0:0 "${Target}/etc/ntp.conf"
@@ -6304,22 +6355,22 @@ function apply_Configuration {
 	mkdir -p "${Target}/${FirstBootPath}/Actions"
 	mkdir -p "${Target}/${FirstBootPath}/Packages"
 	printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "ScriptPath=\`/usr/bin/dirname \"\${0}\"\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "ScriptPath=\`dirname \"\${0}\"\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "IFS=\$'\\\n'" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Actions=( \`/bin/ls \"\${ScriptPath}/Actions\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Packages=( \`/bin/ls \"\${ScriptPath}/Packages\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Actions=( \`ls \"\${ScriptPath}/Actions\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Packages=( \`ls \"\${ScriptPath}/Packages\" 2>/dev/null\` )" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "unset IFS" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "for Action in \"\${Actions[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "	\"\${ScriptPath}/Actions/\${Action}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "done" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Minor=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" '{print \$2}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "Point=\`/usr/bin/sw_vers -productVersion | /usr/bin/awk -F \".\" '{print \$3}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Minor=\`sw_vers -productVersion | awk -F \".\" '{print \$2}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "Point=\`sw_vers -productVersion | awk -F \".\" '{print \$3}'\`" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "if [ \${Minor} -eq 7 -a \${Point} -gt 3 ] || [ \${Minor} -gt 7 ] ; then GateKeeper=\"-allowUntrusted\" ; fi" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "for Package in \"\${Packages[@]}\" ; do" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "	/usr/sbin/installer -dumplog \"\${GateKeeper}\" -pkg \"\${ScriptPath}/Packages/\${Package}\" -target / 2>/dev/null" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "	installer -dumplog \"\${GateKeeper}\" -pkg \"\${ScriptPath}/Packages/\${Package}\" -target / 2>/dev/null" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "done" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "/usr/bin/srm \"/Library/LaunchDaemons/FirstBoot.plist\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
-	echo "/usr/bin/srm -rf \"\${ScriptPath}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "srm \"/Library/LaunchDaemons/FirstBoot.plist\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
+	echo "srm -rf \"\${ScriptPath}\"" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	echo "exit 0" >> "${Target}/${FirstBootPath}/FirstBoot.sh"
 	chown 0:0 "${Target}/${FirstBootPath}/FirstBoot.sh"
 	chmod 755 "${Target}/${FirstBootPath}/FirstBoot.sh"
@@ -6332,18 +6383,18 @@ function apply_Configuration {
 		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 		case "${ComputerName}" in
 			"Model and MAC Address" )
-				echo "ModelName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Model Name: \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
-				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk '{print \$NF}' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "ModelName=\`system_profiler | grep \"Model Name: \" | awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "MACAddress=\`ifconfig en0 | grep \"ether\" | awk '{print \$NF}' | sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
 				echo "ComputerName=\"\${ModelName} \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 			"Generic using MAC Address" )
-				echo "MACAddress=\`/sbin/ifconfig en0 | /usr/bin/grep \"ether\" | /usr/bin/awk '{print \$NF}' | /usr/bin/sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
+				echo "MACAddress=\`ifconfig en0 | grep \"ether\" | awk '{print \$NF}' | sed \"s/://g\"\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;
 				echo "ComputerName=\"Mac \${MACAddress}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 			"Serial Number" )
-				echo "ComputerName=\`/usr/sbin/system_profiler | /usr/bin/grep \"Serial Number (system): \" | /usr/bin/awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
+				echo "ComputerName=\`system_profiler | grep \"Serial Number (system): \" | awk -F \": \" '{print \$NF}'\`" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh" ;;
 		esac
 		echo "LocalHostName=\"\${ComputerName// /-}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-		echo "/usr/sbin/scutil --set ComputerName \"\${ComputerName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
-		echo "/usr/sbin/scutil --set LocalHostName \"\${LocalHostName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		echo "scutil --set ComputerName \"\${ComputerName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
+		echo "scutil --set LocalHostName \"\${LocalHostName}\"" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 		chown 0:0 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
 		chmod 755 "${Target}/${FirstBootPath}/Actions/ComputerName.sh"
@@ -6407,6 +6458,33 @@ function apply_Configuration {
 		chmod 755 "${Target}/${FirstBootPath}/Actions/RemoteManagement.sh"
 		# Begin: Debug Output
 		# cat "${Target}/usr/libexec/FirstBoot/Actions/RemoteManagement.sh"
+		# printf "\n"
+		# End: Debug Output
+	fi
+	# Advanced System Settings, to be implemented
+	if [ ${AdminHostInfo} -eq 1 ] ; then
+		defaults write "${Target}/Library/Preferences/com.apple.loginwindow" "AdminHostInfo" -string "HostName"
+	fi
+	if [ ${ShowFullName} -eq 1 ] ; then
+		defaults write "${Target}/Library/Preferences/com.apple.loginwindow" "SHOWFULLNAME" -bool TRUE
+	fi
+	if [ -e "${Target}/Library/Preferences/com.apple.loginwindow.plist" ] ; then
+		chown 0:0 "${Target}/Library/Preferences/com.apple.loginwindow.plist"
+		chmod 644 "${Target}/Library/Preferences/com.apple.loginwindow.plist"
+	fi
+	# Begin: Debug Output
+	# defaults read "${Target}/Library/Preferences/com.apple.loginwindow"
+	# printf "\n"
+	# End: Debug Output
+	if [ ${SoftwareUpdateCheck} -eq 0 ] ; then
+		printf "Creating:	${FirstBootPath}/Actions/SoftwareUpdateCheck.sh\n"
+		printf \#\!"/bin/sh\n" > "${Target}/${FirstBootPath}/Actions/SoftwareUpdateCheck.sh"
+		echo "softwareupdate --schedule off" >> "${Target}/${FirstBootPath}/Actions/SoftwareUpdateCheck.sh"
+		echo "exit 0" >> "${Target}/${FirstBootPath}/Actions/SoftwareUpdateCheck.sh"
+		chown 0:0 "${Target}/${FirstBootPath}/Actions/SoftwareUpdateCheck.sh"
+		chmod 755 "${Target}/${FirstBootPath}/Actions/SoftwareUpdateCheck.sh"
+		# Begin: Debug Output
+		# cat "${Target}/usr/libexec/FirstBoot/Actions/SoftwareUpdateCheck.sh"
 		# printf "\n"
 		# End: Debug Output
 	fi
@@ -6480,6 +6558,20 @@ function apply_Configuration {
 		ditto "${Target}/System/Library/User Template/${Localization}.lproj" "${Target}/${NFSHomeDirectories[i]}"
 		defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/.GlobalPreferences" AppleMiniaturizeOnDoubleClick -bool FALSE
 		defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/.GlobalPreferences" AppleScrollAnimationEnabled -bool TRUE
+		# Begin: User Preferences
+		if [ ${UserSettings} -eq 1 ] ; then
+			if [ ${TargetOSMinor} -ge 7 ] ; then
+				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/.GlobalPreferences" "AppleShowScrollBars" -string "${AppleShowScrollBars}"
+				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.finder" "WindowState" -dict "ShowStatusBar" -bool ${ShowStatusBar}
+				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.finder" "NewWindowTarget" -string "${NewWindowTarget}"
+				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "GestureMovieSeen" -string "${GestureMovieSeen}"
+				if [ ${CloudSetup} -eq 0 ] ; then
+					defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "DidSeeCloudSetup" -bool TRUE
+					defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "LastSeenCloudProductVersion" -string "10.${TargetOSMinor}"
+				fi
+			fi
+		fi
+		# End: User Preferences
 		chown -Rh ${UniqueID}:staff "${Target}/${NFSHomeDirectories[i]}"
 		if [ ${TargetOSMinor} -eq 5 ] || [ "${AccountTypes[i]}" == "Administrator" ] ; then
 			printf "		Adding to Group(s)"
@@ -6570,7 +6662,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iPhotoLibraryUpgradeTool.plist"
 					) ;
 					bundleID="com.apple.iPhoto" ;
-					if [ -e "${Target}/Applications/iPhoto.app" ] ; then echo "Removing:	iPhoto" ; fi ;;
+					if [ -e "${Target}/Applications/iPhoto.app" ] ; then echo "Removing:	iPhoto" ; else break ; fi ;;
 				"iMovie" )
 					Removables=(
 						"Applications/iMovie.app"
@@ -6581,7 +6673,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iMovie.plist"
 					) ;
 					bundleID="com.apple.iMovieApp" ;
-					if [ -e "${Target}/Applications/iMovie.app" ] ; then echo "Removing:	iMovie" ; fi ;;
+					if [ -e "${Target}/Applications/iMovie.app" ] ; then echo "Removing:	iMovie" ; else break ; fi ;;
 				"iDVD" )
 					Removables=(
 						"Applications/iDVD.app"
@@ -6598,7 +6690,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iDVDThemes.bom"
 						"var/db/receipts/com.apple.pkg.iDVDThemes.plist"
 					) ;
-					if [ -e "${Target}/Applications/iDVD.app" ] ; then echo "Removing:	iDVD" ; fi ;;
+					if [ -e "${Target}/Applications/iDVD.app" ] ; then echo "Removing:	iDVD" ; else break ; fi ;;
 				"GarageBand" )
 					Removables=(
 						"Applications/GarageBand.app"
@@ -6641,7 +6733,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.GarageBandFactoryContent.plist"
 					) ;
 					bundleID="com.apple.garageband" ;
-					if [ -e "${Target}/Applications/GarageBand.app" ] ; then echo "Removing:	GarageBand" ; fi ;;
+					if [ -e "${Target}/Applications/GarageBand.app" ] ; then echo "Removing:	GarageBand" ; else break ; fi ;;
 				"Sounds & Jingles" )
 					Removables=(
 						"Library/Audio/Apple Loops/Apple/iLife Sound Effects"
@@ -6649,7 +6741,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom"
 						"var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.plist"
 					) ;
-					if [ -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] ; then echo "Removing:	Sounds & Jingles" ; fi ;;
+					if [ -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] ; then echo "Removing:	Sounds & Jingles" ; else break ; fi ;;
 				"iWeb" )
 					Removables=(
 						"Applications/iWeb.app"
@@ -6664,7 +6756,7 @@ function apply_Configuration {
 						"var/db/receipts/com.apple.pkg.iWeb.bom"
 						"var/db/receipts/com.apple.pkg.iWeb.plist"
 					) ;
-					if [ -e "${Target}/Applications/iWeb.app" ] ; then echo "Removing:	iWeb" ; fi ;;
+					if [ -e "${Target}/Applications/iWeb.app" ] ; then echo "Removing:	iWeb" ; else break ; fi ;;
 			esac
 			for Removable in "${Removables[@]}" ; do
 				if [ -e "${Target}/${Removable}" ] ; then
@@ -6687,7 +6779,7 @@ function apply_Configuration {
 		if [ -e "${Target}/Library/Receipts/iLifeCookie.pkg" ] || [ -e "${Target}/var/db/receipts/com.apple.pkg.iLifeCookie.bom" ] ; then
 			if [ ! -e "${Target}/Applications/iPhoto.app" ] && [ ! -e "${Target}/Applications/iMovie.app" ] && [ ! -e "${Target}/Applications/iDVD.app" ] && [ ! -e "${Target}/Applications/GarageBand.app" ] && [ ! -e "${Target}/Library/Receipts/iLifeSoundEffects_Loops.pkg" ] && [ ! -e "${Target}/var/db/receipts/com.apple.pkg.iLifeSoundEffects_Loops.bom" ] && [ ! -e "${Target}/Applications/iWeb.app" ] ; then
 				Removables=(
-					"/Library/Application Support/iLifeSlideshow"
+					"Library/Application Support/iLifeSlideshow"
 					"Library/Documentation/Applications/iMovie"
 					"Library/Documentation/Applications/iPhoto"
 					"Library/Documentation/Applications/iWeb"
