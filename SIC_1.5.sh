@@ -38,31 +38,31 @@ RemoteManagement=0
 
 # Additional System Settings, menus not yet implemented
 # Display host info at login window
-AdminHostInfo=0			# 0 (Off) | 1 (On)
+AdminHostInfo=0					# 0 (Off) | 1 (On)
 # Display login window as Name and password
-ShowFullName=0			# 0 (Off) | 1 (On)
+ShowFullName=0					# 0 (Off) | 1 (On)
 # Allow guests to connect to shared folders
-AllowGuestAccess=1		# 1 (On)  | 0 (Off)
+AllowGuestAccess=1				# 1 (On)  | 0 (Off)
 # Allow managed users to add or delete printers
-ManagedUserPrinters=0	# 0 (Off) | 1 (On)
+ManagedUserPrinters=0			# 0 (Off) | 1 (On)
 # Automatically check for updates
-SoftwareUpdateCheck=1	# 1 (On)  | 0 (Off)
+SoftwareUpdateCheck=1			# 1 (On)  | 0 (Off)
 
 # Additional User Settings, menus not yet implemented
-UserSettings=1			# 0 (Off) | 1 (On)
+UserSettings=1					# 0 (Off) | 1 (On)
 # General: Show scroll bars
 AppleShowScrollBars="Always"	# Automatic | WhenScrolling | Always
 # Finder: Show Status Bar
 ShowStatusBar=TRUE
 # Finder: New Finder windows show: Computer; Volume; Home; Desktop; Documents; All My Files
-NewWindowTarget="PfHm"	# PfCm | PfVo | PfHm | PfDe | PfDo | PfAF
+NewWindowTarget="PfHm"			# PfCm | PfVo | PfHm | PfDe | PfDo | PfAF
 # Setup Assistant: Gesture Movie
-GestureMovieSeen="trackpad"
+GestureMovieSeen="trackpad"		# trackpad | 
 # iCloud Setup
-CloudSetup=0			# 1 (On)  | 0 (Off)
+SuppressCloudSetup=1			# 1 (On)  | 0 (Off)
 
 # Version
-SICVersion="1.5b8"
+SICVersion="1.5b9"
 
 # ${0}:	Path to this script
 ScriptName=`basename "${0}"`
@@ -1201,10 +1201,11 @@ function set_Localization {
 
 function set_AppleLanguages {
 	# ${1}: Language Code
-	case ${TargetOSMinor} in
-		8 ) AppleLanguages=( "ar" "ca" "cs" "da" "nl" "el" "en" "fi" "fr" "de" "he" "hr" "hu" "it" "ja" "ko" "nb" "pl" "pt" "pt-PT" "ro" "ru" "sk" "es" "sv" "th" "tr" "uk" "zh-Hans" "zh-Hant" ) ;;
-		* ) AppleLanguages=( "en" "ja" "fr" "de" "es" "it" "nl" "sv" "nb" "da" "fi" "pl" "pt" "pt-PT" "ru" "zh-Hans" "zh-Hant" "ko" ) ;;
-	esac
+	if [ ${TargetOSMinor} -ge 8 ] ; then
+		AppleLanguages=( "ar" "ca" "cs" "da" "nl" "el" "en" "fi" "fr" "de" "he" "hr" "hu" "it" "ja" "ko" "nb" "pl" "pt" "pt-PT" "ro" "ru" "sk" "es" "sv" "th" "tr" "uk" "zh-Hans" "zh-Hant" )
+	else
+		AppleLanguages=( "en" "ja" "fr" "de" "es" "it" "nl" "sv" "nb" "da" "fi" "pl" "pt" "pt-PT" "ru" "zh-Hans" "zh-Hant" "ko" )
+	fi
 	i=0
 	for Element in "${AppleLanguages[@]}" ; do
 		if [ "${1}" == "${Element}" ] ; then unset AppleLanguages[i] ; break ; fi
@@ -6002,11 +6003,11 @@ function apply_Configuration {
 	fi
 	vsdbutil -a "${Target}"
 	set_Localization "${Language}"
+	set_AppleLanguages "${LanguageCode}"
 	printf "Creating:	/Library/Preferences/.GlobalPreferences.plist\n"
 	if [ -e "${Target}/Library/Preferences/.GlobalPreferences.plist" ] ; then
 		rm -f "${Target}/Library/Preferences/.GlobalPreferences.plist"
 	fi
-	set_AppleLanguages "${LanguageCode}"
 	defaults write "${Target}/Library/Preferences/.GlobalPreferences" "AppleLanguages" -array "${AppleLanguages[@]}"
 	if [ ${TargetOSMinor} -gt 5 ] ; then
 		defaults write "${Target}/Library/Preferences/.GlobalPreferences" "AppleLocale" -string "${LanguageCode}_${SACountryCode}"
@@ -6209,6 +6210,8 @@ function apply_Configuration {
 	fi
 	chown 0:0 "${Target}/Library/Preferences/.GlobalPreferences.plist"
 	chmod 644 "${Target}/Library/Preferences/.GlobalPreferences.plist"
+	printf "Creating:	/etc/localtime\n"
+	ln -fs "/usr/share/zoneinfo/${ZTIMEZONENAME}" "${Target}/etc/localtime"
 	# Begin: Debug Output
 	# /usr/libexec/PlistBuddy -c "Print" "${Target}/Library/Preferences/.GlobalPreferences.plist"
 	# printf "\n"
@@ -6565,7 +6568,7 @@ function apply_Configuration {
 				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.finder" "WindowState" -dict "ShowStatusBar" -bool ${ShowStatusBar}
 				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.finder" "NewWindowTarget" -string "${NewWindowTarget}"
 				defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "GestureMovieSeen" -string "${GestureMovieSeen}"
-				if [ ${CloudSetup} -eq 0 ] ; then
+				if [ ${SuppressCloudSetup} -eq 1 ] ; then
 					defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "DidSeeCloudSetup" -bool TRUE
 					defaults write "${Target}/${NFSHomeDirectories[i]}/Library/Preferences/com.apple.SetupAssistant" "LastSeenCloudProductVersion" -string "10.${TargetOSMinor}"
 				fi
@@ -6823,6 +6826,7 @@ function apply_Configuration {
 	fi
 	if [ ${TargetType} -eq 2 ] ; then
 		printf "Exporting Image(s)\n"
+		if [ ! -d "${MasterFolder}" ] ; then mkdir -p "${MasterFolder}" ; fi
 		if [ -e "${MasterFolder}/${MasterName}" ] ; then rm -f "${MasterFolder}/${MasterName}" ; fi
 		if [ -e "${MasterFolder}/${RecoveryName}" ] ; then rm -f "${MasterFolder}/${RecoveryName}" ; fi
 		for TargetVolume in "${TargetVolumes[@]}" ; do
